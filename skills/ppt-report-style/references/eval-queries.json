@@ -1,0 +1,22 @@
+[
+  {"query": "帮我把这个ppt重新设计一下，字体只用宋体，颜色别超过三种", "should_trigger": true},
+  {"query": "这一页太挤了，重新排一下，正文不能小于16号字", "should_trigger": true},
+  {"query": "按我的规范做PPT", "should_trigger": true},
+  {"query": "把这五个案例各做成一页汇报幻灯片，每页配图和图表，再给逐字稿", "should_trigger": true},
+  {"query": "给这个ppt补一页中西对比，标题别写得太口水", "should_trigger": true},
+  {"query": "帮我检查这个pptx里有没有字号过小、颜色超标的地方", "should_trigger": true},
+  {"query": "把这个数据页改成图表加方块的版式，关键数字标出来", "should_trigger": true},
+  {"query": "表格和方块在我这儿的PPT里分别什么时候用？按我的习惯排一版看看", "should_trigger": true},
+  {"query": "我要在组会讲20分钟，帮我把讲稿写进每页PPT的备注里", "should_trigger": true},
+  {"query": "这五页长得一模一样，改得每页有点区别，但整体别跑偏", "should_trigger": true},
+  {"query": "帮我把这个pdf转成pptx", "should_trigger": false},
+  {"query": "给这张活动海报设计一版配色方案", "should_trigger": false},
+  {"query": "帮我找一下这个ppt里的错别字", "should_trigger": false},
+  {"query": "统计一下这个ppt一共有多少页、多少字", "should_trigger": false},
+  {"query": "我的pptx打不开了，帮我修复", "should_trigger": false},
+  {"query": "把这个ppt批量导出成图片", "should_trigger": false},
+  {"query": "帮我做一个PPT模板的Python生成脚本，只要空白框架", "should_trigger": false},
+  {"query": "准备一下明天答辩可能被问的问题", "should_trigger": false},
+  {"query": "帮我用python把这堆pptx批量转成pdf", "should_trigger": false},
+  {"query": "帮我分析这份PPT里的数据结论有没有自相矛盾", "should_trigger": false}
+]

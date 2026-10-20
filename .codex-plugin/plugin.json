@@ -1,0 +1,27 @@
+{
+  "name": "ppt-report-style",
+  "version": "0.1.0",
+  "description": "中文汇报 PPT 的排版规范与工作流：字体/配色限制、页面骨架、表格与方块的取舍、每页几何记忆点、逐字稿与交付自检。",
+  "author": {
+    "name": "YOUR_GITHUB_USERNAME",
+    "url": "https://github.com/YOUR_GITHUB_USERNAME"
+  },
+  "homepage": "https://github.com/YOUR_GITHUB_USERNAME/ppt-report-style",
+  "repository": "https://github.com/YOUR_GITHUB_USERNAME/ppt-report-style",
+  "license": "MIT",
+  "keywords": ["ppt", "pptx", "presentation", "chinese", "design", "reporting"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "汇报 PPT 规范",
+    "shortDescription": "中文汇报 PPT 的排版规范、版式骨架与交付自检",
+    "longDescription": "按一套固定的中文汇报规范生成或改版 PPT：字体与三色限制、统一页面骨架、表格与方块的取舍规则、每页一个几何记忆点、逐字稿写入备注，并附字号/配色校验与预览脚本。",
+    "developerName": "YOUR_GITHUB_USERNAME",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": [
+      "按这套规范帮我做一份汇报 PPT",
+      "把这个 PPT 按规范重新排版并出预览图",
+      "检查这个 pptx 的字号和配色是否达标"
+    ]
+  }
+}
