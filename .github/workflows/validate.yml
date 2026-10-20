@@ -30,6 +30,8 @@ jobs:
           PY
       - name: Style check on example deck
         run: python skills/ppt-report-style/scripts/verify_ppt_style.py skills/ppt-report-style/assets/example-slide.pptx
+      - name: Structural audit on example deck
+        run: python skills/ppt-report-style/scripts/audit_ppt.py skills/ppt-report-style/assets/example-slide.pptx
       - name: Example deck regenerates with identical content
         run: |
           git show HEAD:skills/ppt-report-style/assets/example-slide.pptx > /tmp/before.pptx
