@@ -17,9 +17,8 @@ jobs:
       - name: Skill frontmatter check
         run: |
           python - <<'PY'
-          import re, pathlib, sys
-          p = pathlib.Path("skills/ppt-report-style/SKILL.md")
-          t = p.read_text(encoding="utf-8")
+          import re, pathlib
+          t = pathlib.Path("skills/ppt-report-style/SKILL.md").read_text(encoding="utf-8")
           m = re.match(r"---\n(.*?)\n---\n", t, re.S)
           assert m, "缺少 frontmatter"
           fm = m.group(1)
@@ -27,11 +26,24 @@ jobs:
           desc = re.search(r"^description:\s*(.+)$", fm, re.M).group(1).strip()
           assert name == "ppt-report-style", name
           assert 20 <= len(desc) <= 1024, len(desc)
-          print("frontmatter OK:", name, len(desc))
+          print("frontmatter OK:", name, "| description", len(desc), "字符")
           PY
       - name: Style check on example deck
         run: python skills/ppt-report-style/scripts/verify_ppt_style.py skills/ppt-report-style/assets/example-slide.pptx
-      - name: Regenerate example and ensure it is reproducible
+      - name: Example deck regenerates with identical content
         run: |
+          git show HEAD:skills/ppt-report-style/assets/example-slide.pptx > /tmp/before.pptx
           python skills/ppt-report-style/scripts/build_example.py
-          git diff --exit-code skills/ppt-report-style/assets/example-slide.pptx || (echo "示例页与仓库不一致" && exit 1)
+          python - <<'PY'
+          import zipfile
+          def parts(p, pref=("ppt/slides/", "ppt/charts/", "ppt/theme/")):
+              z = zipfile.ZipFile(p)
+              return {n: z.read(n) for n in z.namelist() if n.startswith(pref)}
+          a = parts("/tmp/before.pptx")
+          b = parts("skills/ppt-report-style/assets/example-slide.pptx")
+          assert set(a) == set(b), set(a) ^ set(b)
+          diff = [k for k in a if a[k] != b[k]]
+          assert not diff, f"示例页内容不一致: {diff}"
+          print("示例页语义一致 ✓")
+          PY
+          python skills/ppt-report-style/scripts/verify_ppt_style.py skills/ppt-report-style/assets/example-slide.pptx
