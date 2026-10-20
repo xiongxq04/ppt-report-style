@@ -27,13 +27,13 @@
 **方式一：skill-installer（Codex 内）**
 
 ```
-$skill-installer install https://github.com/YOUR_GITHUB_USERNAME/ppt-report-style/tree/main/skills/ppt-report-style
+$skill-installer install https://github.com/xiongxq04/ppt-report-style/tree/main/skills/ppt-report-style
 ```
 
 **方式二：手动**
 
 ```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/ppt-report-style.git
+git clone https://github.com/xiongxq04/ppt-report-style.git
 cp -r ppt-report-style/skills/ppt-report-style ~/.codex/skills/
 ```
 

@@ -1,0 +1,37 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip python-pptx
+      - name: Skill frontmatter check
+        run: |
+          python - <<'PY'
+          import re, pathlib, sys
+          p = pathlib.Path("skills/ppt-report-style/SKILL.md")
+          t = p.read_text(encoding="utf-8")
+          m = re.match(r"---\n(.*?)\n---\n", t, re.S)
+          assert m, "缺少 frontmatter"
+          fm = m.group(1)
+          name = re.search(r"^name:\s*(.+)$", fm, re.M).group(1).strip().strip('"\'')
+          desc = re.search(r"^description:\s*(.+)$", fm, re.M).group(1).strip()
+          assert name == "ppt-report-style", name
+          assert 20 <= len(desc) <= 1024, len(desc)
+          print("frontmatter OK:", name, len(desc))
+          PY
+      - name: Style check on example deck
+        run: python skills/ppt-report-style/scripts/verify_ppt_style.py skills/ppt-report-style/assets/example-slide.pptx
+      - name: Regenerate example and ensure it is reproducible
+        run: |
+          python skills/ppt-report-style/scripts/build_example.py
+          git diff --exit-code skills/ppt-report-style/assets/example-slide.pptx || (echo "示例页与仓库不一致" && exit 1)
