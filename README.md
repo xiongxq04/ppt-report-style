@@ -107,3 +107,25 @@ MIT，见 [LICENSE](LICENSE)。
 
 - [Agent Skills 开放规范](https://agentskills.io)
 - [Codex 插件与技能文档](https://developers.openai.com/codex/plugins/build)
+
+## English
+
+A style guide + executable workflow for **Chinese-language reporting decks**. It tells the agent how to lay out a slide so the result is consistent instead of something you have to re-lay out every time.
+
+- Typography: only SimSun (宋体) / KaiTi (楷体) / HeiTi (黑体); body text never below 16pt; text limited to black, white and one accent colour (`#283E4E` by default).
+- Pick the container by content: **tables for dense, data-heavy material**; **boxes/grids for narrative, mechanisms and parallel points** — and never put a mini-heading like "Key metrics" inside a box.
+- Metric name and value belong in the **same sentence**.
+- Fixed page skeleton: header → 25pt declarative title → subtitle → rule → two-column body → bottom takeaway bar.
+- One **geometric motif per slide** (circle, triangle, donut, dotted route, hexagon…) — different on every page of a deck, while the skeleton stays identical.
+- ~1 minute of speaker notes per slide; sources and caveats live in the notes, never on the slide.
+- Three checks before delivery: machine validation → rendered preview → trace every number back to the source material.
+
+**Install**
+
+```bash
+$skill-installer install https://github.com/xiongxq04/ppt-report-style/tree/main/skills/ppt-report-style
+```
+
+**Scripts**: `verify_ppt_style.py` (font size / palette / font whitelist), `preview_ppt.py` (pptx → HTML preview), `build_example.py` (regenerate the neutral example deck).
+
+MIT licensed.
