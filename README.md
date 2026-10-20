@@ -52,13 +52,15 @@ $ppt-report-style 帮我做一套关于××的汇报 PPT，10 页
 | 脚本 | 用途 |
 | --- | --- |
 | `scripts/verify_ppt_style.py` | 校验 pptx 的字号下限、配色、字体白名单（含图表内文字） |
-| `scripts/preview_ppt.py` | 把 pptx 渲染成 HTML 预览（形状、表格、图表近似渲染） |
+| `scripts/audit_ppt.py` | 结构审查：越界、文本溢出、元素重叠、字形缺失、备注缺失、表格宽度 |
+| `scripts/preview_ppt.py` | 把 pptx 渲染成 HTML 预览（形状、表格、柱/条/环/散点图近似渲染） |
 | `scripts/build_example.py` | 重新生成 `assets/example-slide.pptx` 中性示例页 |
 
 ```bash
 python3 -m pip install python-pptx
 python scripts/verify_ppt_style.py 你的.pptx
 python scripts/verify_ppt_style.py 你的.pptx --accent 1F4E79 --min-size 18
+python scripts/audit_ppt.py 你的.pptx
 python scripts/preview_ppt.py 你的.pptx out.html --slide 0
 ```
 

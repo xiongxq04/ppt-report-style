@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""把 pptx 渲染成 HTML 预览（形状、文字、图片、图表近似渲染），用于交付前自检。
+"""把 pptx 渲染成 HTML 预览（形状、文字、图片、表格、图表近似渲染），用于交付前自检。
 
 用法: python preview_ppt.py <file.pptx> <out.html> [--accent 283E4E] [--slide 0]
 说明: 图表按数据近似绘制，用于检查布局/溢出/对齐，不等于 PowerPoint 的最终渲染。
@@ -42,6 +42,28 @@ def chart_html(sh, l, t, w, h):
         body = ("<svg width='%.1f' height='%.1f'><circle cx='%.1f' cy='%.1f' r='%.1f' fill='none' stroke='%s' stroke-width='%.1f'/>"
                 "<circle cx='%.1f' cy='%.1f' r='%.1f' fill='none' stroke='%s' stroke-width='%.1f' stroke-dasharray='%.1f %.1f' transform='rotate(-90 %.1f %.1f)'/></svg>"
                 % (w, h, cx, cy, r, BAND, sw, cx, cy, r, ACCENT, sw, dash, circ-dash, cx, cy))
+    elif "SCATTER" in str(ct):
+        xs = []
+        try:
+            ser = ch._chartSpace.find(".//"+qn("c:ser"))
+            if ser is not None:
+                cache = ser.find(qn("c:xVal")+"/"+qn("c:numRef")+"/"+qn("c:numCache"))
+                if cache is not None:
+                    for pt in cache.findall(qn("c:pt")):
+                        v = pt.find(qn("c:v"))
+                        if v is not None and v.text:
+                            xs.append(float(v.text))
+        except Exception:
+            xs = []
+        ys = vals
+        if xs and ys:
+            x0, x1 = min(xs), max(xs); y0, y1 = min(ys), max(ys)
+            dx = (x1-x0) or 1.0; dy = (y1-y0) or 1.0
+            for x, y in zip(xs, ys):
+                px = 34 + (x-x0)/dx*(w-68)
+                py = h-28 - (y-y0)/dy*(h-58)
+                body += ("<div style='position:absolute;left:%.1fpx;top:%.1fpx;width:7px;height:7px;"
+                         "border-radius:50%%;background:%s'></div>" % (px-3.5, py-3.5, ACCENT))
     else:
         mx = max([abs(v) for v in vals] + [1])
         try:
@@ -50,17 +72,19 @@ def chart_html(sh, l, t, w, h):
         except Exception: pass
         if ct == XL_CHART_TYPE.COLUMN_CLUSTERED:
             pad_b, pad_t = 30, 30; avail = h-pad_b-pad_t
-            n = max(len(vals), 1); gap = w*0.18; bw = (w-gap*(n+1))/n
+            n = max(len(vals), 1)
+            bw = w/n*0.52                       # 柱宽：留出间隔，避免出现负宽度
+            gap = (w - n*bw)/(n+1)
             for i, (c, v) in enumerate(zip(cats, vals)):
-                bh = avail*abs(v)/mx; x = gap+i*(bw+gap); y = pad_t+avail-bh
+                bh = max(1.0, avail*abs(v)/mx); x = gap+i*(bw+gap); y = pad_t+avail-bh
                 body += ("<div style='position:absolute;left:%.1fpx;top:%.1fpx;width:%.1fpx;height:%.1fpx;background:%s'></div>"
                          "<div style='position:absolute;left:%.1fpx;top:%.1fpx;width:%.1fpx;text-align:center;font:16px bold;color:%s'>%s</div>"
                          "<div style='position:absolute;left:%.1fpx;top:%.1fpx;width:%.1fpx;text-align:center;font:16px color:#000;white-space:nowrap'>%s</div>"
-                         % (x, y, bw, bh, ACCENT, x, y-22, bw, ACCENT, '%g'%v, x-gap/2, pad_t+avail+8, bw+gap, c))
+                         % (x, y, bw, bh, ACCENT, x-6, y-20, bw+12, ACCENT, '%g'%v, x-10, pad_t+avail+8, bw+20, c))
         else:
             lab_w = w*0.34; bar_x = lab_w+6; avail = w-bar_x-8; rowh = h/max(len(vals), 1)
             for i, (c, v) in enumerate(zip(cats, vals)):
-                bh = min(rowh*0.5, 44); y = i*rowh+(rowh-bh)/2; bwd = avail*abs(v)/mx
+                bh = min(rowh*0.5, 44); y = i*rowh+(rowh-bh)/2; bwd = max(2.0, avail*abs(v)/mx)
                 body += ("<div style='position:absolute;left:0;top:%.1fpx;width:%.1fpx;text-align:right;font:16px color:#000;white-space:nowrap'>%s</div>"
                          "<div style='position:absolute;left:%.1fpx;top:%.1fpx;width:%.1fpx;height:%.1fpx;background:%s'></div>"
                          "<div style='position:absolute;left:%.1fpx;top:%.1fpx;font:16px bold;color:%s;white-space:nowrap'>%s</div>"
@@ -77,8 +101,7 @@ for sh in sl.shapes:
     l = sh.left/EMU*DPI; t = sh.top/EMU*DPI; w = sh.width/EMU*DPI; h = sh.height/EMU*DPI
     st = "left:%.2fpx;top:%.2fpx;width:%.2fpx;height:%.2fpx" % (l, t, w, h)
     if getattr(sh, "has_table", False):
-        tb = sh.table
-        rows = []
+        tb = sh.table; rows = []
         for r in tb.rows:
             cells = []
             for c in r.cells:
@@ -121,9 +144,11 @@ for sh in sl.shapes:
         elif at == MSO_SHAPE.ISOSCELES_TRIANGLE: clip = "clip-path:polygon(50% 0,100% 100%,0 100%);"
         elif at == MSO_SHAPE.HEXAGON: clip = "clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);"
     except Exception: pass
+    rot = getattr(sh, "rotation", 0) or 0
     if fill: st += ";background:#" + fill
+    if border: st += ";" + border
     if clip: st += ";" + clip
-    elif border: st += ";" + border
+    if rot: st += ";transform:rotate(%.1fdeg);transform-origin:50%% 50%%" % rot
     if sh.has_text_frame and sh.text_frame.text.strip():
         paras = ""
         for p in sh.text_frame.paragraphs:
@@ -143,5 +168,3 @@ for sh in sl.shapes:
 parts.append("</div></body></html>")
 open(args.out, "w", encoding="utf-8").write("".join(parts))
 print("html", args.out)
-
-
