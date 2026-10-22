@@ -10,6 +10,7 @@ from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE, MSO_SHAPE
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.enum.dml import MSO_FILL
+from pptx.oxml.ns import qn
 
 ap = argparse.ArgumentParser()
 ap.add_argument("src"); ap.add_argument("out")
@@ -27,6 +28,26 @@ W = prs.slide_width/EMU*DPI; H = prs.slide_height/EMU*DPI
 def rgb(c, d="000000"):
     try: return str(c.rgb) if c is not None and c.type is not None else d
     except Exception: return d
+
+EA_MAP = {"宋体": "SimSun", "楷体": "KaiTi", "黑体": "SimHei"}
+
+def ea_face(rr):
+    """读 a:ea（中文字形槽）；python-pptx 的 font.name 只管 a:latin（西文字形槽）。"""
+    rPr = rr._r.find(qn("a:rPr"))
+    if rPr is None:
+        return ""
+    ea = rPr.find(qn("a:ea"))
+    return ea.get("typeface") if ea is not None else ""
+
+def face_stack(rr):
+    """按 latin + ea 双槽拼 CSS 字体栈，让预览与 PowerPoint 的实际渲染一致。"""
+    lat, ea = rr.font.name or "", ea_face(rr)
+    parts = []
+    if lat:
+        parts.append('"%s"' % _h.escape(lat, quote=True))
+    if ea:
+        parts.append('"%s"' % _h.escape(EA_MAP.get(ea, ea), quote=True))
+    return ",".join(parts) or '"Microsoft YaHei"'
 
 def chart_html(sh, l, t, w, h):
     ch = sh.chart; ct = ch.chart_type
@@ -113,11 +134,9 @@ for sh in sl.shapes:
                 for para in c.text_frame.paragraphs:
                     for rr in para.runs:
                         sz = rr.font.size.pt if rr.font.size else 16
-                        nm = rr.font.name or ""
-                        face = "SimSun" if "宋" in nm else ("KaiTi" if "楷" in nm else "Microsoft YaHei")
                         al = {1:"left",2:"center",3:"right"}.get(int(para.alignment or 1),"left")
-                        runs += ("<div style='text-align:%s;font-family:\"%s\";font-size:%.2fpx;color:#%s;font-weight:%s'>%s</div>"
-                                 % (al, face, sz*DPI/72, rgb(rr.font.color), "bold" if nm=="黑体" else "normal", _h.escape(rr.text)))
+                        runs += ("<div style='text-align:%s;font-family:%s;font-size:%.2fpx;color:#%s;font-weight:%s'>%s</div>"
+                                 % (al, face_stack(rr), sz*DPI/72, rgb(rr.font.color), "bold" if rr.font.bold else "normal", _h.escape(rr.text)))
                 cells.append("<td style='background:%s;padding:6px 10px;vertical-align:middle'>%s</td>" % (bg, runs))
             rows.append("<tr style='height:%.1fpx'>%s</tr>" % (r.height/EMU*DPI, "".join(cells)))
         parts.append("<div class=sh style='%s'><table style='border-collapse:collapse;width:100%%;table-layout:fixed'>%s</table></div>" % (st, "".join(rows)))
@@ -155,10 +174,8 @@ for sh in sl.shapes:
             runs = ""
             for rr in p.runs:
                 sz = rr.font.size.pt if rr.font.size else 16
-                nm = rr.font.name or ""
-                face = "SimSun" if "宋" in nm else ("KaiTi" if "楷" in nm else "Microsoft YaHei")
-                runs += "<span style='font-family:\"%s\";font-size:%.2fpx;color:#%s;font-weight:%s'>%s</span>" % (
-                    face, sz*DPI/72, rgb(rr.font.color), "bold" if nm == "黑体" else "normal", _h.escape(rr.text))
+                runs += "<span style='font-family:%s;font-size:%.2fpx;color:#%s;font-weight:%s'>%s</span>" % (
+                    face_stack(rr), sz*DPI/72, rgb(rr.font.color), "bold" if rr.font.bold else "normal", _h.escape(rr.text))
             al = {1: "left", 2: "center", 3: "right"}.get(int(p.alignment or 1), "left")
             paras += "<div class=pg style='line-height:1.25;text-align:%s'>%s</div>" % (al, runs)
         parts.append("<div class=sh style='%s'><div class=tx'>%s</div></div>" % (st, paras))

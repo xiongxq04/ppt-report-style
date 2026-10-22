@@ -17,15 +17,19 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "assets", "example-slide.pptx")
 NAVY="283E4E"; BLACK="000000"; WHITE="FFFFFF"; BAND="F1F5F8"; LINE="B7C1C8"
 HEI="黑体"; KAI="楷体"; SONG="宋体"
+# 西文槽只允许 Arial 与 Times New Roman；中文字形走 a:ea，两者分开设置。
+LATIN_OF = {HEI: "Arial", SONG: "Times New Roman", KAI: "Times New Roman"}
 
-def font(run, size, color, face):
-    run.font.size=Pt(size); run.font.color.rgb=RGBColor.from_string(color); run.font.name=face
+def font(run, size, color, face, latin=None):
+    """face = 中文字形（a:ea / a:cs）；latin = 西文字形（a:latin），默认按 face 配对。"""
+    lat = latin or LATIN_OF.get(face, "Arial")
+    run.font.size=Pt(size); run.font.color.rgb=RGBColor.from_string(color); run.font.name=lat
     rPr = run._r.get_or_add_rPr()
-    for tag in ("a:ea","a:cs"):
+    for tag, tf in (("a:ea", face), ("a:cs", face)):
         el = rPr.find(qn(tag))
         if el is None:
             el = rPr.makeelement(qn(tag),{}); rPr.insert_element_before(el,"a:sym","a:hlinkClick","a:hlinkMouseOver","a:rtl","a:endParaRPr")
-        el.set("typeface", face)
+        el.set("typeface", tf)
 
 def rect(sl,l,t,w,h,fill=None,line=None,lw=0.75,shape=MSO_SHAPE.RECTANGLE):
     s = sl.shapes.add_shape(shape,Inches(l),Inches(t),Inches(w),Inches(h)); s.shadow.inherit=False
@@ -46,11 +50,11 @@ def text(sl,l,t,w,h,segs,size,align=PP_ALIGN.LEFT,anchor=MSO_ANCHOR.TOP,ls=1.0):
     return tb
 
 def header(sl, page, title, sub):
-    text(sl,6.40,0.26,6.10,0.28,[("示例 · 汇报页骨架",BLACK,SONG)],16,PP_ALIGN.RIGHT)
-    text(sl,12.60,0.26,0.91,0.28,[(page,NAVY,HEI)],16,PP_ALIGN.RIGHT)
-    text(sl,0.55,0.62,12.96,0.52,[(title,NAVY,HEI)],25)
-    text(sl,0.55,1.18,12.96,0.30,[(sub,BLACK,SONG)],16)
-    rect(sl,0.55,1.62,12.96,0.012,fill=NAVY)
+    text(sl,6.40,0.24,6.10,0.34,[("示例 · 汇报页骨架",BLACK,SONG)],16,PP_ALIGN.RIGHT)
+    text(sl,12.60,0.24,0.91,0.34,[(page,NAVY,HEI)],16,PP_ALIGN.RIGHT)
+    text(sl,0.55,0.58,12.96,0.66,[(title,NAVY,HEI)],30)
+    text(sl,0.55,1.26,12.96,0.36,[(sub,BLACK,SONG)],20)
+    rect(sl,0.55,1.70,12.96,0.012,fill=NAVY)
 
 prs = Presentation(); prs.slide_width=12858750; prs.slide_height=7232650
 
@@ -58,28 +62,28 @@ prs = Presentation(); prs.slide_width=12858750; prs.slide_height=7232650
 s1 = prs.slides.add_slide(prs.slide_layouts[6])
 header(s1,"01","示例页：左文右图与几何记忆点",
        "本示例仅演示版式与视觉规范，数值均为虚构占位数据。")
-rect(s1,0.55,1.74,7.10,0.95,fill=BAND); rect(s1,0.55,1.74,0.045,0.95,fill=NAVY)
-text(s1,0.76,1.84,6.74,0.75,[("这是导语块：演示位置、字号、行距与浅底强调样式，文字内容为占位示意。",BLACK,KAI)],17,anchor=MSO_ANCHOR.MIDDLE,ls=1.18)
+rect(s1,0.55,1.82,7.10,1.05,fill=BAND); rect(s1,0.55,1.82,0.045,1.05,fill=NAVY)
+text(s1,0.76,1.92,6.74,0.85,[("这是导语块：演示位置、字号、行距与浅底强调样式，文字内容为占位示意。",BLACK,KAI)],20,anchor=MSO_ANCHOR.MIDDLE,ls=1.2)
 rows=[("示例指标 A 达到 ","38.6","（占位数值）"),
       ("示例指标 B 同比变化 ","+12.4","（占位数值）"),
       ("示例指标 C 覆盖范围 ","1,200","（占位数值）")]
-y=2.84
+y=2.97
 for a,b,c in rows:
-    rect(s1,0.55,y,0.045,0.66,fill=NAVY)
-    text(s1,0.76,y,6.84,0.66,[(a,BLACK,SONG),(b,NAVY,HEI),(c,BLACK,SONG)],17,anchor=MSO_ANCHOR.MIDDLE,ls=1.16)
-    y+=0.70
-rect(s1,0.55,5.06,7.10,1.05,fill=BAND); rect(s1,0.55,5.06,0.045,1.05,fill=NAVY)
-text(s1,0.76,5.16,6.74,0.85,[("示例判断句：用一句话收束左侧信息，主题色加粗，作为口头汇报的落点。",NAVY,HEI)],17,anchor=MSO_ANCHOR.MIDDLE,ls=1.18)
-rect(s1,7.85,1.74,5.66,1.72,fill=BAND,line=LINE)
-text(s1,7.85,2.30,5.66,0.40,[("占位配图区域：实稿放实景照片，按框裁切填满。",BLACK,SONG)],16,PP_ALIGN.CENTER)
-rect(s1,7.85,3.66,1.80,1.80,fill=NAVY,shape=MSO_SHAPE.OVAL)
-text(s1,7.95,4.10,1.60,0.60,[("38.6%",WHITE,HEI)],26,PP_ALIGN.CENTER,MSO_ANCHOR.MIDDLE)
-text(s1,7.95,4.66,1.60,0.36,[("占位数值",WHITE,SONG)],16,PP_ALIGN.CENTER)
-text(s1,9.95,3.66,3.56,0.26,[("对比图（示例）",BLACK,SONG)],16,PP_ALIGN.CENTER)
+    rect(s1,0.55,y,0.045,0.72,fill=NAVY)
+    text(s1,0.76,y,6.84,0.72,[(a,BLACK,SONG),(b,NAVY,HEI),(c,BLACK,SONG)],18,anchor=MSO_ANCHOR.MIDDLE,ls=1.2)
+    y+=0.78
+rect(s1,0.55,5.35,7.10,1.10,fill=BAND); rect(s1,0.55,5.35,0.045,1.10,fill=NAVY)
+text(s1,0.76,5.45,6.74,0.90,[("示例判断句：用一句话收束左侧信息，靠黑体与主题色强调，作为口头汇报的落点。",NAVY,HEI)],18,anchor=MSO_ANCHOR.MIDDLE,ls=1.2)
+rect(s1,7.85,1.82,5.66,1.62,fill=BAND,line=LINE)
+text(s1,7.85,2.42,5.66,0.40,[("占位配图区域：实稿放实景照片，按框裁切填满。",BLACK,SONG)],16,PP_ALIGN.CENTER)
+rect(s1,7.85,3.62,1.72,1.72,fill=NAVY,shape=MSO_SHAPE.OVAL)
+text(s1,7.90,3.96,1.62,0.66,[("38.6%",WHITE,HEI)],36,PP_ALIGN.CENTER,MSO_ANCHOR.MIDDLE)
+text(s1,7.95,4.72,1.52,0.36,[("占位数值",WHITE,SONG)],16,PP_ALIGN.CENTER)
+text(s1,9.95,3.62,3.56,0.30,[("对比图（示例）",BLACK,SONG)],16,PP_ALIGN.CENTER)
 cd = CategoryChartData(); cd.categories=["甲","乙","丙"]; cd.add_series("s",(62,45,28))
-gf = s1.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED,Inches(9.95),Inches(3.96),Inches(3.56),Inches(2.42),cd)
+gf = s1.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED,Inches(9.95),Inches(3.94),Inches(3.56),Inches(2.40),cd)
 ch = gf.chart; ch.has_title=False; ch.has_legend=False
-ch.font.size=Pt(16); ch.font.name=SONG; ch.font.color.rgb=RGBColor.from_string(BLACK)
+ch.font.size=Pt(16); ch.font.name="Arial"; ch.font.color.rgb=RGBColor.from_string(BLACK)
 cs = ch._chartSpace
 if cs.find(qn("c:spPr")) is None:
     cs.find(qn("c:chart")).addnext(parse_xml('<c:spPr %s><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>'%nsdecls("c","a")))
@@ -88,11 +92,11 @@ if pa is not None and pa.find(qn("c:spPr")) is None:
     pa.append(parse_xml('<c:spPr %s><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>'%nsdecls("c","a")))
 pl = ch.plots[0]; pl.gap_width=90; pl.has_data_labels=True
 dl = pl.data_labels; dl.number_format='#,##0'; dl.number_format_is_linked=False
-dl.font.size=Pt(16); dl.font.bold=True; dl.font.name=HEI; dl.font.color.rgb=RGBColor.from_string(NAVY)
+dl.font.size=Pt(16); dl.font.bold=True; dl.font.name="Arial"; dl.font.color.rgb=RGBColor.from_string(NAVY)
 dl.position=XL_LABEL_POSITION.OUTSIDE_END
 sr = pl.series[0]; sr.format.fill.solid(); sr.format.fill.fore_color.rgb=RGBColor.from_string(NAVY); sr.format.line.fill.background()
 ca = ch.category_axis; ca.has_major_gridlines=False; ca.major_tick_mark=XL_TICK_MARK.NONE
-ca.tick_labels.font.size=Pt(16); ca.tick_labels.font.name=SONG; ca.tick_labels.font.color.rgb=RGBColor.from_string(BLACK)
+ca.tick_labels.font.size=Pt(16); ca.tick_labels.font.name="Arial"; ca.tick_labels.font.color.rgb=RGBColor.from_string(BLACK)
 ca.format.line.color.rgb=RGBColor.from_string(NAVY); ca.format.line.width=Pt(1)
 va = ch.value_axis; va.has_major_gridlines=False
 d = va._element.find(qn("c:delete"))
@@ -100,14 +104,18 @@ if d is None:
     d = va._element.makeelement(qn("c:delete"),{}); va._element.find(qn("c:scaling")).addnext(d)
 d.set("val","1"); va.maximum_scale=80
 for rPr in cs.iter(qn("a:defRPr")):
-    latin = rPr.find(qn("a:latin")); face = latin.get("typeface") if latin is not None else SONG
+    # 图表里中文取 ea、西文与数字取 latin：ea 固定宋体，latin 缺省补 Arial。
+    latin = rPr.find(qn("a:latin"))
+    if latin is None:
+        latin = rPr.makeelement(qn("a:latin"),{}); rPr.insert_element_before(latin,"a:ea","a:cs","a:sym","a:hlinkClick","a:hlinkMouseOver","a:rtl","a:endParaRPr")
+    latin.set("typeface", latin.get("typeface") or "Arial")
     for tag in ("a:ea","a:cs"):
         el = rPr.find(qn(tag))
         if el is None:
             el = rPr.makeelement(qn(tag),{}); rPr.insert_element_before(el,"a:sym","a:hlinkClick","a:hlinkMouseOver","a:rtl","a:endParaRPr")
-        el.set("typeface", face)
-rect(s1,0.55,6.76,0.045,0.56,fill=NAVY)
-text(s1,0.76,6.76,12.60,0.56,[("示例结论条：用一句话写清证据强弱与边界，作为整页的落点。",BLACK,SONG)],16,anchor=MSO_ANCHOR.MIDDLE,ls=1.1)
+        el.set("typeface", SONG)
+rect(s1,0.55,6.80,0.045,0.62,fill=NAVY)
+text(s1,0.76,6.80,12.60,0.62,[("示例结论条：用一句话写清证据强弱与边界，作为整页的落点。",BLACK,HEI)],18,anchor=MSO_ANCHOR.MIDDLE,ls=1.1)
 s1.notes_slide.notes_text_frame.text = """【示例页 · 讲稿模板】
 本页只是版式示例，所有数值都是虚构占位数据，不要当作真实结论引用。
 讲解时按这个节奏走：先用一句话导语说明这一页要回答什么问题；再逐条讲三条实证，每条都是"指标名 + 数值 + 口径"写在同一句里；然后用一句判断收束，把数字背后的含义说清楚；最后用底部结论条点出证据强弱与边界。
@@ -123,7 +131,7 @@ DATA=[["指标","2024","2025","变化","口径"],
       ["指标乙","62.1","58.4","-3.7","示例口径"],
       ["指标丙","340","512","+50.6%","示例口径"],
       ["指标丁","9.6","12.8","+33.3%","示例口径"]]
-shape = s2.shapes.add_table(len(DATA),5,Inches(0.55),Inches(1.86),Inches(12.96),Inches(3.30))
+shape = s2.shapes.add_table(len(DATA),5,Inches(0.55),Inches(1.94),Inches(12.96),Inches(3.30))
 tbl = shape.table
 for i,w in enumerate([3.00,2.10,2.10,2.10,3.66]): tbl.columns[i].width=Inches(w)
 for ri,row in enumerate(DATA):
@@ -143,7 +151,7 @@ for ri,row in enumerate(DATA):
         elif ci in (1,2,3): font(r,16,NAVY,HEI)
         else: font(r,16,BLACK,SONG)
 rect(s2,0.55,5.60,0.045,0.90,fill=NAVY)
-text(s2,0.76,5.60,12.60,0.90,[("表格页同样遵守字号下限与三色限制：表头主题色底白字，关键数值主题色，正文黑色。",BLACK,SONG)],17,anchor=MSO_ANCHOR.MIDDLE,ls=1.18)
+text(s2,0.76,5.60,12.60,0.90,[("表格页同样遵守字阶与三色限制：表头黑体白字，数值列主题色，正文宋体黑色，单元格一律 16pt 起。",BLACK,SONG)],18,anchor=MSO_ANCHOR.MIDDLE,ls=1.2)
 s2.notes_slide.notes_text_frame.text = """【表格示例页 · 讲稿模板】
 本页演示"强数据用表格"的样式：表头用主题色底白字，数值列用主题色，正文用黑色，交替行加浅底。
 讲的时候不要逐格念表，而是先说这张表回答什么问题、结论是什么，再点出两三个关键数字的变化。
