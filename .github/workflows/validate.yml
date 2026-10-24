@@ -28,10 +28,16 @@ jobs:
           assert 20 <= len(desc) <= 1024, len(desc)
           print("frontmatter OK:", name, "| description", len(desc), "字符")
           PY
+      - name: Palette self-check
+        run: python skills/ppt-report-style/scripts/palette_utils.py --check
       - name: Style check on example deck
         run: python skills/ppt-report-style/scripts/verify_ppt_style.py skills/ppt-report-style/assets/example-slide.pptx
       - name: Structural audit on example deck
         run: python skills/ppt-report-style/scripts/audit_ppt.py skills/ppt-report-style/assets/example-slide.pptx
+      - name: Unified check (balanced + strict)
+        run: |
+          python skills/ppt-report-style/scripts/check_ppt.py skills/ppt-report-style/assets/example-slide.pptx --mode balanced
+          python skills/ppt-report-style/scripts/check_ppt.py skills/ppt-report-style/assets/example-slide.pptx --mode strict
       - name: Example deck regenerates with identical content
         run: |
           git show HEAD:skills/ppt-report-style/assets/example-slide.pptx > /tmp/before.pptx
@@ -49,3 +55,5 @@ jobs:
           print("示例页语义一致 ✓")
           PY
           python skills/ppt-report-style/scripts/verify_ppt_style.py skills/ppt-report-style/assets/example-slide.pptx
+      - name: Regression (positive must be clean, negative must hit expected rules)
+        run: python skills/ppt-report-style/scripts/run_regression.py
