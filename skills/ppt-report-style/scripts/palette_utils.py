@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-<<<<<<< HEAD
 """配色系统工具：对比度、色相分组、色阶派生与预设自检。
 
 预设配色（A/B/C）的权威定义在 references/profiles.json；本模块是它的可执行实现，
@@ -24,27 +23,6 @@ from profile_lib import get_preset, preset_names, preset_all_colors
 # —— 默认点缀色（= 预设 A 的 accent）——
 ACCENT_DEFAULT = "0072B2"
 # 色阶派生工具的演示数据（generate_scale 输入/输出示例，不是可用色清单）
-=======
-"""配色系统工具：中性色判定、主题色阶、对比色、辅助色、WCAG 对比度与色相分组。
-
-权威定义见 references/palette-system.md；本模块是它的可执行实现。
-
-自检:
-  python palette_utils.py --check
-其他用法:
-  python palette_utils.py --contrast 283E4E FFFFFF
-  python palette_utils.py --scale 1F4E79
-  python palette_utils.py --report 283E4E
-"""
-import argparse
-import colorsys
-import sys
-
-sys.stdout.reconfigure(encoding="utf-8")
-
-# —— 配色方案（与 references/palette-system.md 保持一致）——
-ACCENT_DEFAULT = "283E4E"
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 THEME_SCALE = ("142129", "1E303B", "283E4E", "4A6577", "8199A8", "B7C7D2", "E4EBF0")
 CONTRAST_SCALE = ("8C5A16", "B4771F", "C98B2E", "E0B15B")
 SUPPORT_SCALE = ("2F4E48", "4F7C74", "8DB0A8", "D6E5E1")
@@ -246,7 +224,6 @@ def custom_scale_report(base):
     return "\n".join(lines)
 
 
-<<<<<<< HEAD
 def preset_report(name="A"):
     p = get_preset(name)
     lines = [f"预设 {name}：{p['label']}", f"出处：{p['source']}",
@@ -274,32 +251,13 @@ def self_check(name="A"):
             assert text_safe(p[role]), f"预设 {key} 的 {role} #{p[role]} 对比度不足"
     print("配色工具自检通过")
     print(preset_report(name))
-=======
-def self_check():
-    assert abs(contrast_ratio("000000", "FFFFFF") - 21.0) < 0.01
-    assert abs(contrast_ratio("283E4E", "283E4E") - 1.0) < 0.001
-    assert is_neutral("F1F5F8") and is_neutral("000000") and is_neutral("808080")
-    assert not is_neutral("283E4E") and not is_neutral("E0B15B")
-    assert family_of("283E4E") == "theme"
-    assert family_of("4A6577") == "theme"
-    assert family_of("C98B2E") == "contrast"
-    assert family_of("4F7C74") == "support"
-    assert family_of("FF00FF") == "unknown"
-    print("配色工具自检通过")
-    print(report())
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 
 
 def main():
     parser = argparse.ArgumentParser()
-<<<<<<< HEAD
     parser.add_argument("--check", action="store_true", help="运行自检并打印预设对比度表")
     parser.add_argument("--preset", default="A", choices=tuple(preset_names()))
     parser.add_argument("--report", nargs="?", const=ACCENT_DEFAULT, help="打印预设表（旧参数兼容）")
-=======
-    parser.add_argument("--check", action="store_true", help="运行自检并打印配色表")
-    parser.add_argument("--report", nargs="?", const=ACCENT_DEFAULT, help="打印配色表（可指定主题色）")
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
     parser.add_argument("--contrast", nargs=2, metavar=("前景", "背景"))
     parser.add_argument("--scale", metavar="基色")
     args = parser.parse_args()
@@ -313,15 +271,9 @@ def main():
         print(custom_scale_report(args.scale))
         return 0
     if args.report:
-<<<<<<< HEAD
         print(preset_report(args.preset))
         return 0
     self_check(args.preset)
-=======
-        print(report(args.report))
-        return 0
-    self_check()
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
     return 0
 
 

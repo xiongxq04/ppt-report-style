@@ -1,10 +1,6 @@
 # PPT 检查与交付规则
 
-<<<<<<< HEAD
 规则阈值只在 `references/profiles.json` 与 SKILL.md 定义，检查脚本实现这些阈值；本文件规定分级、协议和交付方式。严重度按档位分治（fast 多数降为建议；balanced/strict 从严），同一规则在不同档位可能是 ERROR 或 WARNING——以脚本输出为准。
-=======
-规则阈值只在本 skill 的专项文件定义，检查脚本实现这些阈值；本文件规定分级、协议和交付方式。
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 
 ## 检查结果分级
 
@@ -52,7 +48,6 @@
 | 前缀 | 覆盖范围 | 示例 |
 | --- | --- | --- |
 | `GEO.` | 几何与容器 | `GEO.OUTSIDE` 越界、`GEO.TABLE_WIDTH` 列宽不一致 |
-<<<<<<< HEAD
 | `TXT.` | 文字 | `TXT.OVERFLOW` 溢出、`TXT.OVERLAP` 重叠、`TXT.GLYPH` 字形缺失、`TXT.NOBREAK` 西文不可断行、`TXT.FULLWIDTH` 全角西文、`TXT.TABLE_OVERFLOW` 单元格撑高、`TXT.PREFIX` 结论行前缀、`TXT.CAVEAT` 口径声明超量 |
 | `TYP.` | 字号 | `TYP.MINSIZE` 字号过小、`TYP.LADDER` 不在字阶内、`TYP.STEPS` 一页档数过多、`TYP.POSTER` 非封面海报大字、`TYP.CHARTSIZE` 图表字号过小 |
 | `PAL.` | 配色 | `PAL.CONTRAST` 对比度、`PAL.COLOR` 方案外颜色、`PAL.CHARTCOLOR` 图表颜色、`PAL.ACCENT_PAGE` 点缀每页超额、`PAL.CHART_SERIES` 图表点亮超额、`PAL.HUE` 色相组数、`PAL.INHERIT` 继承色无法判定 |
@@ -62,16 +57,6 @@
 | `EFF.` | 效果 | `EFF.SHADOW` 阴影/特效、`EFF.STYLE_REF` 主题特效引用（effectRef） |
 | `MED.` | 媒体与对象 | `MED.SMARTART` 禁用对象 |
 | `NOTE.` | 备注 | `NOTE.SHORT` 逐字稿过短（档位分治） |
-=======
-| `TXT.` | 文字 | `TXT.OVERFLOW` 溢出、`TXT.OVERLAP` 重叠、`TXT.GLYPH` 字形缺失、`TXT.NOBREAK` 西文不可断行、`TXT.FULLWIDTH` 全角西文、`TXT.TABLE_OVERFLOW` 单元格撑高 |
-| `TYP.` | 字号 | `TYP.MINSIZE` 字号过小、`TYP.LADDER` 不在字阶内、`TYP.STEPS` 一页档数过多、`TYP.INHERIT` 字号继承无法判定 |
-| `PAL.` | 配色 | `PAL.CONTRAST` 对比度、`PAL.COLOR` 方案外颜色、`PAL.HUE` 色相组数、`PAL.AREA_CONTRAST` 对比色面积、`PAL.AREA_SUPPORT` 辅助色面积、`PAL.INHERIT` 继承色无法判定 |
-| `FONT.` | 字体槽 | `FONT.EA` 中文字槽越界、`FONT.EA_MISSING` 缺中文槽、`FONT.LATIN` 西文槽越界、`FONT.LATIN_MISSING` 缺西文槽、`FONT.LATIN_CJK` 西文槽填了中文字体、`FONT.EA_BOLD` 黑体叠加粗体、`FONT.TABLE_KAI` 楷体入表格 |
-| `LAY.` | 布局 | `LAY.REPEAT` 骨架重复、`LAY.PURETEXT` 纯文字页比例、`LAY.PURETEXT_FLAT` 纯文字页无排版层级、`LAY.BLOCKRATIO` 方块矩阵页占比、`LAY.MODEL` 关系模型覆盖、`LAY.MEANS` 缺少视觉手段 |
-| `IMG.` | 配图 | `IMG.RES` 分辨率、`IMG.QUALITY` 画质、`IMG.MISSING` 缺失 |
-| `MED.` | 媒体与对象 | `MED.SMARTART` 禁用对象 |
-| `NOTE.` | 备注 | `NOTE.SHORT` 逐字稿过短 |
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 
 ## 统一结果协议
 
@@ -95,7 +80,6 @@
 ## 工具
 
 ```text
-<<<<<<< HEAD
 python scripts/check_ppt.py deck.pptx --tier balanced --preset A --layout-report
 python scripts/check_ppt.py deck.pptx --tier strict --json report.json
 python scripts/preview_ppt.py deck.pptx preview.html --slide 0
@@ -105,17 +89,6 @@ python run_regression.py          # 回归：正例零错误零警告；反例�
 - `check_ppt.py` 是统一入口：调度 `audit_ppt.py`（几何、布局、配图、备注）与 `verify_ppt_style.py`（配色、对比度、字号、字体），去重后按错误、警告、建议和例外汇总；档位经 `--tier`（旧参数 `--mode` 等价）传给两个子脚本。
 - `palette_utils.py --check` 做预设对比度自检；`preview_ppt.py` 只负责渲染预览，不做风格判定。
 - `run_regression.py` 是回归基线：正例（6 页学术示例）在 balanced 与 strict 下必须零错误零警告，三套配色预设各做一次端到端冒烟，反例必须命中全部预期规则（见脚本内 `EXPECTED_NEGATIVE_RULES`）。
-=======
-uv run --python 3.14 --with 'python-pptx>=1.0,<2' python scripts/check_ppt.py deck.pptx --layout-report
-uv run --python 3.14 --with 'python-pptx>=1.0,<2' python scripts/check_ppt.py deck.pptx --mode strict --json report.json
-uv run --python 3.14 --with 'python-pptx>=1.0,<2' python scripts/preview_ppt.py deck.pptx preview.html
-```
-
-- `check_ppt.py` 是统一入口：调度 `audit_ppt.py`（几何、布局、配图、备注）与 `verify_ppt_style.py`（配色、对比度、字号、字体），去重后按错误、警告、建议和例外汇总。
-- `palette_utils.py` 提供色阶与对比度自检，`--check` 可打印色阶对照表。
-- `preview_ppt.py` 只负责渲染预览，不做风格判定。
-- `run_regression.py` 是回归基线：正例必须零错误零警告，反例必须命中全部预期规则。
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 - 自动检查不能代替打开 PPT 后的视觉复核；布局分类是保守估算，最终以人工审阅为准。
 - 用户反馈修改后，必须重新生成并重跑检查，而不是只重跑生成。
 

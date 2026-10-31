@@ -2,7 +2,6 @@
 """统一执行 PPT 结构与风格检查，并按错误 / 警告 / 建议 / 例外汇总。
 
 职责划分：audit_ppt.py 管几何、布局骨架、配图、禁用对象、字形与备注；
-<<<<<<< HEAD
 verify_ppt_style.py 管字阶、配色与对比度、点缀限额、图表配色、中西文双字体槽。
 本脚本只做调度、去重、例外过滤和汇总。阈值唯一来源：references/profiles.json。
 
@@ -11,14 +10,6 @@ verify_ppt_style.py 管字阶、配色与对比度、点缀限额、图表配色
                       [--exceptions exceptions.json] [--preview-out preview.html]
                       [--json report.json] [--layout-report]
   --mode balanced|strict  兼容旧参数，等价于 --tier（与 --tier 同时给时 --tier 优先）
-=======
-verify_ppt_style.py 管字阶、配色与对比度、中西文双字体槽。本脚本只做调度、去重、例外过滤和汇总。
-
-用法:
-  python check_ppt.py <file.pptx> [--mode balanced|strict] [--exceptions exceptions.json]
-                      [--preview-out preview.html] [--json report.json] [--layout-report]
-主要选项与两个子脚本一致，见各自 --help。
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 """
 import argparse
 import json
@@ -30,11 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.stdout.reconfigure(encoding="utf-8")
 
 from audit_ppt import audit, format_findings, format_layout
-<<<<<<< HEAD
 from profile_lib import get_tier, get_preset, preset_colors
-=======
-from palette_utils import ACCENT_DEFAULT
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 from verify_ppt_style import check as style_check
 
 SEVERITY_ORDER = {"ERROR": 0, "WARNING": 1, "SUGGESTION": 2, "例外": 3}
@@ -78,7 +65,6 @@ def apply_exceptions(findings, rules):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("file")
-<<<<<<< HEAD
     parser.add_argument("--mode", choices=("balanced", "strict"), default=None,
                         help="兼容旧参数；等价于 --tier")
     parser.add_argument("--tier", choices=("fast", "balanced", "strict"), default=None)
@@ -91,17 +77,6 @@ def main():
     parser.add_argument("--latin-fonts", default=None, help="西文字体（a:latin）白名单覆盖")
     parser.add_argument("--sizes", default=None, help="允许的字阶档位覆盖")
     parser.add_argument("--max-steps", type=int, default=None)
-=======
-    parser.add_argument("--mode", choices=("balanced", "strict"), default="balanced")
-    parser.add_argument("--min-size", type=float, default=16)
-    parser.add_argument("--accent", default=ACCENT_DEFAULT)
-    parser.add_argument("--contrast-color", default=None)
-    parser.add_argument("--support", default=None)
-    parser.add_argument("--fonts", default="宋体,楷体,黑体", help="中文字体（a:ea）白名单")
-    parser.add_argument("--latin-fonts", default="Arial,Times New Roman", help="西文字体（a:latin）白名单")
-    parser.add_argument("--sizes", default="16,18,20,30,36,44", help="允许的字阶档位")
-    parser.add_argument("--max-steps", type=int, default=5)
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
     parser.add_argument("--allow-colors", default="")
     parser.add_argument("--allow-cjk-latin", action="store_true")
     parser.add_argument("--allow-smartart", action="store_true")
@@ -117,7 +92,6 @@ def main():
         print("文件不存在:", args.file)
         return 2
 
-<<<<<<< HEAD
     tier = args.tier or args.mode or "balanced"
     T = get_tier(tier)
     P = get_preset(args.preset)
@@ -142,28 +116,6 @@ def main():
         max_steps=args.max_steps,
         allow_cjk_latin=args.allow_cjk_latin,
         max_per_rule=args.max_per_rule,
-=======
-    notes_min = args.notes_min if args.notes_min is not None else (150 if args.mode == "strict" else 0)
-    allow_colors = [item.strip() for item in args.allow_colors.split(",") if item.strip()]
-
-    findings, layout_rows = audit(args.file, min_size=args.min_size, notes_min=notes_min,
-                                  mode=args.mode, allow_smartart=args.allow_smartart)
-    findings = set(findings)
-    findings.update(style_check(
-        args.file,
-        accent=args.accent,
-        min_size=args.min_size,
-        fonts=args.fonts,
-        allow=allow_colors,
-        mode=args.mode,
-        contrast_color=args.contrast_color,
-        support=args.support,
-        max_per_rule=args.max_per_rule,
-        latin_fonts=args.latin_fonts,
-        sizes=args.sizes,
-        max_steps=args.max_steps,
-        allow_cjk_latin=args.allow_cjk_latin,
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
     ))
     ordered = sorted(findings, key=lambda item: (item[1], SEVERITY_ORDER.get(item[0], 9), item[2]))
 
@@ -180,11 +132,7 @@ def main():
         counts[severity] = counts.get(severity, 0) + 1
 
     print(f"文件: {os.path.abspath(args.file)}")
-<<<<<<< HEAD
     print(f"档位: {T['label']}（{tier}） · 预设: {P['label']}（{args.preset}）")
-=======
-    print(f"模式: {args.mode}")
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
     print(f"结果: {counts['ERROR']} 个错误，{counts['WARNING']} 个警告，"
           f"{counts['SUGGESTION']} 个建议，{len(excepted)} 条例外")
     if ordered or excepted:
@@ -196,12 +144,8 @@ def main():
         with open(args.json_out, "w", encoding="utf-8") as handle:
             json.dump({
                 "file": os.path.abspath(args.file),
-<<<<<<< HEAD
                 "tier": tier,
                 "preset": args.preset,
-=======
-                "mode": args.mode,
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
                 "counts": counts,
                 "findings": [
                     {"rule": rule, "severity": severity, "slide": slide_no or None,
@@ -220,12 +164,8 @@ def main():
     exit_code = 1 if counts["ERROR"] else 0
     if args.preview_out:
         preview_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "preview_ppt.py")
-<<<<<<< HEAD
         completed = subprocess.run([sys.executable, preview_script, args.file, args.preview_out],
                                    check=False)
-=======
-        completed = subprocess.run([sys.executable, preview_script, args.file, args.preview_out], check=False)
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
         if completed.returncode != 0:
             print("预览生成失败")
             exit_code = exit_code or completed.returncode
@@ -233,8 +173,4 @@ def main():
 
 
 if __name__ == "__main__":
-<<<<<<< HEAD
     raise SystemExit(main())
-=======
-    raise SystemExit(main())
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552

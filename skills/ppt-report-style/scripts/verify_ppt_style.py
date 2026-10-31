@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-<<<<<<< HEAD
 """风格校验：字阶、文字配色与对比度、点缀色限额、图表配色、双字体槽、前缀与口径。
 
 阈值唯一来源：references/profiles.json（经 profile_lib 加载）。
@@ -19,37 +18,12 @@ import argparse
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-=======
-"""校验 pptx 是否符合汇报规范：字号下限、文字配色、中文字体（ea 槽）与西文字体（latin 槽）双白名单。
-
-用法:
-  python verify_ppt_style.py <file.pptx> [more.pptx ...] [选项]
-选项:
-  --accent HEX        主题色，默认 0072B2
-  --min-size N        最小字号(pt)，默认 16；D9D9D9 页眉页脚档下限 14
-  --fonts "a,b,c"     允许的中文字体（写入 a:ea），默认 宋体,楷体,黑体,微软雅黑
-  --latin-fonts "x,y" 允许的西文字体（写入 a:latin），默认 Arial,Times New Roman
-  --allow-colors HEX  额外允许的文字色（逗号分隔）
-  --allow-cjk-latin   容忍西文槽填中文字体（只用于跑旧稿，新稿不要加）
-  --sizes "a,b,..."   允许的字阶档位，默认 16,18,20,30,36,44
-  --max-steps N       每页最多几档字号，默认 5
-退出码 0 表示全部通过。
-
-为什么必须分两槽：python-pptx 的 run.font.name 写的是 a:latin（西文槽），中文字符实际取 a:ea。
-只写 font.name=宋体 → 英文数字用宋体的西文字形，字距松、字形丑，且本项检查会漏掉；
-只写 a:ea → 英文回落到主题字体，跨机器不稳定。
-正确做法：两槽都显式写，并按 宋体/楷体 → Times New Roman、黑体 → Arial 配对。
-"""
-import sys, os, argparse
-sys.stdout.reconfigure(encoding="utf-8")
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 try:
     from pptx import Presentation
     from pptx.oxml.ns import qn
 except ImportError:
     print("需要 python-pptx：pip install python-pptx"); sys.exit(2)
 
-<<<<<<< HEAD
 from profile_lib import get_tier, get_preset, preset_colors, accent_family, is_hf_zone
 from palette_utils import contrast_ratio, hue_group, is_neutral, normalize_hex
 
@@ -70,21 +44,6 @@ def has_cjk(s):
 
 def has_latin(s):
     return any((c.isalpha() or c.isdigit()) and not ("　" <= c <= "鿿") for c in s)
-=======
-BASE = {"000000", "FFFFFF", "6E6E6E", "D9D9D9", "BFBFBF"}
-HF_COLOR = "D9D9D9"   # 页眉页脚专用极浅灰：下限 14pt，豁免对比度（用户 2026-10-31 定版）
-HF_MIN = 14
-CJK_FACES = {"宋体", "楷体", "黑体", "SimSun", "KaiTi", "SimHei", "MS Mincho", "Microsoft YaHei"}
-
-
-def has_cjk(s):
-    return any("\u3000" <= c <= "\u9fff" or "\uff00" <= c <= "\uffef" for c in s)
-
-
-def has_latin(s):
-    return any(c.isalpha() or c.isdigit() for c in s) and not all(
-        "\u3000" <= c <= "\u9fff" or "\uff00" <= c <= "\uffef" or not c.isalnum() for c in s)
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 
 
 def slots(run):
@@ -100,7 +59,6 @@ def slots(run):
     )
 
 
-<<<<<<< HEAD
 def _run_color(run):
     try:
         raw = run.font.color.rgb
@@ -335,151 +293,19 @@ def main():
     ap.add_argument("--max-steps", type=int, default=None)
     ap.add_argument("--accent", default=None, help="临时覆盖预设点缀色")
     ap.add_argument("--max-per-rule", type=int, default=3)
-=======
-def _lum(hex6):
-    try:
-        r,g,b = (int(hex6[i:i+2],16)/255 for i in (0,2,4))
-    except Exception:
-        return None
-    f = lambda c: c/12.92 if c <= 0.03928 else ((c+0.055)/1.055)**2.4
-    return 0.2126*f(r)+0.7152*f(g)+0.0722*f(b)
-
-def _contrast_vs_white(hex6):
-    l = _lum(hex6)
-    return None if l is None else 1.05/(l+0.05)
-
-def check(path, accent, min_size, fonts, latin_fonts, allow, allow_cjk_latin, sizes, max_steps):
-    allowed_colors = BASE | {accent.upper()} | {c.upper().strip() for c in allow if c.strip()}
-    ea_ok = {f.strip() for f in fonts.split(",") if f.strip()}
-    lat_ok = {f.strip() for f in latin_fonts.split(",") if f.strip()}
-    size_ok = {float(s) for s in sizes.split(",") if s.strip()}
-    bad = []
-    deck_text = []
-    prs = Presentation(path)
-    for si, slide in enumerate(prs.slides, 1):
-        steps = set()
-        for sh in slide.shapes:
-            if getattr(sh, "has_text_frame", False):
-                for p in sh.text_frame.paragraphs:
-                    for r in p.runs:
-                        txt = r.text
-                        if not txt.strip():
-                            continue
-                        sz = r.font.size.pt if r.font.size else None
-                        try:
-                            col = str(r.font.color.rgb)
-                        except Exception:
-                            col = "?"
-                        hf_tier = (col == HF_COLOR)   # 页眉页脚档：14pt 下限、豁免对比度
-                        floor = HF_MIN if hf_tier else min_size
-                        if sz is None or sz < floor:
-                            bad.append((si, "字号", txt[:20], sz))
-                        if sz is not None:
-                            steps.add(sz)
-                            if size_ok and sz not in size_ok:
-                                bad.append((si, "字号不在字阶内", txt[:20], f"{sz}pt，字阶={sorted(size_ok)}"))
-                        if col not in allowed_colors:
-                            bad.append((si, "颜色", txt[:20], col))
-                        deck_text.append(txt)
-                        if not hf_tier:
-                            c_ratio = _contrast_vs_white(col)
-                            if c_ratio is not None and c_ratio < 4.5:
-                                bad.append((si, "对比度不足", txt[:16], f"{col} {c_ratio:.2f}:1 < 4.5:1"))
-                        if sz is not None and sz >= 40 and si != 1:
-                            bad.append((si, "正文海报大字", txt[:16], f"{sz}pt：≥40pt 仅允许封面主标题"))
-                        lat, ea = slots(r)
-                        if has_cjk(txt):
-                            if not ea:
-                                bad.append((si, "中文字体未设置", txt[:16], "a:ea 空，继承主题字体"))
-                            elif ea_ok and ea not in ea_ok:
-                                bad.append((si, "中文字体", txt[:16], ea))
-                        if has_latin(txt):
-                            if not lat:
-                                bad.append((si, "西文字体未设置", txt[:16], "a:latin 空"))
-                            elif lat in CJK_FACES:
-                                if not allow_cjk_latin:
-                                    bad.append((si, "西文用中文字体", txt[:16], f"latin={lat}（英文将用中文字形渲染）"))
-                            elif lat_ok and lat not in lat_ok:
-                                bad.append((si, "西文字体", txt[:16], lat))
-                        if ea == "黑体" and r.font.bold:
-                            bad.append((si, "黑体加粗", txt[:16], "合成粗会糊边；强调改用字号或主题色"))
-            if getattr(sh, "has_chart", False):
-                for rPr in sh.chart._chartSpace.iter(qn("a:defRPr")):
-                    sz = rPr.get("sz")
-                    if sz and int(sz) < min_size * 100:
-                        bad.append((si, "图表字号", "", int(sz) / 100))
-                    sf = rPr.find(qn("a:solidFill"))
-                    if sf is not None:
-                        sc = sf.find(qn("a:srgbClr"))
-                        if sc is not None and sc.get("val", "").upper() not in allowed_colors:
-                            bad.append((si, "图表颜色", "", sc.get("val")))
-            if getattr(sh, "has_table", False):
-                for row in sh.table.rows:
-                    for cell in row.cells:
-                        for p in cell.text_frame.paragraphs:
-                            for r in p.runs:
-                                if not r.text.strip():
-                                    continue
-                                sz = r.font.size.pt if r.font.size else None
-                                if sz is None or sz < min_size:
-                                    bad.append((si, "表格字号", r.text[:16], sz))
-                                if sz is not None:
-                                    steps.add(sz)
-                                    if size_ok and sz not in size_ok:
-                                        bad.append((si, "表格字号不在字阶内", r.text[:16], sz))
-                                lat, ea = slots(r)
-                                if ea == "楷体":
-                                    bad.append((si, "楷体入表格", r.text[:16], "表格只用宋体/黑体"))
-                                if has_cjk(r.text) and ea_ok and (not ea or ea not in ea_ok):
-                                    bad.append((si, "表格中文字体", r.text[:16], ea or "空"))
-                                if has_latin(r.text) and lat in CJK_FACES and not allow_cjk_latin:
-                                    bad.append((si, "表格西文用中文字体", r.text[:16], lat))
-        if len(steps) > max_steps:
-            bad.append((si, "字号层级过多", "", f"{len(steps)} 档 > {max_steps}：{sorted(steps)}"))
-    joined = "".join(deck_text)
-    for kw in ("结论：","判断：","收束："):
-        n = joined.count(kw)
-        if n:
-            bad.append((0, "结论行前缀", kw, f"出现 {n} 次，应为 0（直接写判断句）"))
-    n = joined.count("虚构")
-    if n > 4:
-        bad.append((0, "口径声明超量", "虚构", f"出现 {n} 次 > 4（全片最多两处声明位）"))
-    return bad
-
-
-def main():
-    ap = argparse.ArgumentParser(add_help=True)
-    ap.add_argument("files", nargs="*")
-    ap.add_argument("--accent", default="0072B2")
-    ap.add_argument("--min-size", type=float, default=16)
-    ap.add_argument("--fonts", default="宋体,楷体,黑体,微软雅黑", help="中文字体（a:ea）白名单")
-    ap.add_argument("--latin-fonts", default="Arial,Times New Roman", help="西文字体（a:latin）白名单")
-    ap.add_argument("--allow-colors", default="")
-    ap.add_argument("--allow-cjk-latin", action="store_true", help="容忍西文槽填中文字体（旧稿用）")
-    ap.add_argument("--sizes", default="14,16,18,20,30,36,44", help="允许的字阶档位，逗号分隔")
-    ap.add_argument("--max-steps", type=int, default=5, help="每页最多出现几档字号")
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
     a = ap.parse_args()
     if not a.files:
         print(__doc__); return 2
     allow = [c.strip() for c in a.allow_colors.split(",") if c.strip()]
-<<<<<<< HEAD
     sizes = [float(s) for s in a.sizes.split(",")] if a.sizes else None
-=======
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
     rc = 0
     for path in a.files:
         if not os.path.exists(path):
             print("文件不存在:", path); rc = 1; continue
-<<<<<<< HEAD
         bad = check(path, tier=a.tier, preset=a.preset, allow=allow, fonts=a.fonts,
                     latin_fonts=a.latin_fonts, sizes=sizes, min_size=a.min_size,
                     max_steps=a.max_steps, allow_cjk_latin=a.allow_cjk_latin,
                     accent=a.accent, max_per_rule=a.max_per_rule)
-=======
-        bad = check(path, a.accent, a.min_size, a.fonts, a.latin_fonts, allow, a.allow_cjk_latin,
-                    a.sizes, a.max_steps)
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
         if bad:
             rc = 1
             print("FAIL", os.path.basename(path), f"({len(bad)} 项)")
@@ -492,9 +318,5 @@ def main():
     return rc
 
 
-<<<<<<< HEAD
 if __name__ == "__main__":
     sys.exit(main())
-=======
-sys.exit(main())
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552

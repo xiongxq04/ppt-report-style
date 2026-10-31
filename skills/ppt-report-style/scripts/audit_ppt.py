@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-<<<<<<< HEAD
 """结构审查：几何越界 / 文本溢出 / 重叠 / 字形与字体槽 / 阴影特效 / 配图分辨率 / 布局骨架 / 备注。
 
 阈值唯一来源：references/profiles.json（经 profile_lib 加载）。
@@ -27,46 +26,16 @@ import unicodedata
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-=======
-"""汇报 PPT 自动审查：越界 / 文本溢出 / 元素重叠 / 字形与字体槽 / 备注 / 表格与图表。
-
-用法: python audit_ppt.py <file.pptx> [更多文件 ...] [选项]
-选项:
-  --min-size N        最小字号(pt)，默认 16
-  --accent HEX        主题色，默认 0072B2
-  --fonts "a,b,c"     允许的中文字体（a:ea），默认 宋体,楷体,黑体,微软雅黑
-  --latin-fonts "x,y" 允许的西文字体（a:latin），默认 Arial,Times New Roman
-  --notes-min N       每页备注最少字数，默认 150
-  --overflow-tol      溢出容差倍数，默认 1.06
-退出码 0 = 全部通过。
-
-中英混排的三条硬道理（本脚本据此判定）：
-1. 宽度不能按"西文一律 0.52 倍"估：Arial 里 i/l 约 0.28 em，M/W 约 0.9 em，全大写缩写
-   （BPM、LUFS、RMS）比小写宽得多。这里按字符分类取 em 宽，宁可估宽也不漏报。
-2. 西文不能像中文那样逐字断行：换行只发生在空格与中文之间。一个长 token
-   （如 conversation_log.csv）比栏宽还长时，必然溢出或被挤到下一栏——单独报"西文不可断行"。
-3. 字体分两槽：a:latin 管西文、a:ea 管中文。只设 font.name=宋体 会让英文用中文字形渲染，
-   所以两槽都要查；表格单元格还要按栏宽单独算换行，否则"行高 0.3in"会被撑成两行而压到下方图形。
-"""
-import sys, os, math, argparse, unicodedata
-sys.stdout.reconfigure(encoding="utf-8")
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 try:
     from pptx import Presentation
     from pptx.oxml.ns import qn
 except ImportError:
     print("需要 python-pptx：pip install python-pptx"); sys.exit(2)
 
-<<<<<<< HEAD
 from profile_lib import get_tier, get_preset
 
 EMU_IN = 914400.0
 EMU_PT = 12700.0
-=======
-EMU_IN = 914400.0
-EMU_PT = 12700.0
-BASE = {"000000", "FFFFFF", "6E6E6E", "D9D9D9", "BFBFBF"}
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 CJK_FACES = {"宋体", "楷体", "黑体", "SimSun", "KaiTi", "SimHei", "Microsoft YaHei"}
 NARROW_LATIN = set("ijlrtf|.,:;'\"()[]{}/!-\\` ")
 WIDE_LATIN = set("mwMW@%&")
@@ -79,13 +48,7 @@ def is_cjk(ch):
 def char_em(ch):
     if is_cjk(ch):
         return 1.0
-<<<<<<< HEAD
     if ch == " " or ch in NARROW_LATIN:
-=======
-    if ch == " ":
-        return 0.30
-    if ch in NARROW_LATIN:
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
         return 0.30
     if ch in WIDE_LATIN:
         return 0.90
@@ -99,10 +62,6 @@ def char_em(ch):
 
 
 def tokens(s):
-<<<<<<< HEAD
-=======
-    """按可断行位置切分：中文逐字可断，西文连续串不可断，空格附着在前一段。"""
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
     out, cur = [], ""
     for ch in s:
         if is_cjk(ch):
@@ -149,7 +108,6 @@ def has_latin(s):
     return any(c.isalnum() and not is_cjk(c) for c in s)
 
 
-<<<<<<< HEAD
 def _classify_skeleton(text_boxes, charts, tables, pictures, sw, sh_):
     """保守估算页面骨架；分错的风险交给人工审阅（checking.md 约定）。"""
     if tables and any(t[3] > 0.65 * sw for t in tables):
@@ -234,50 +192,10 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
                     elif not lat or (lat_ok and lat not in lat_ok):
                         add(T["font_slot_severity"], "FONT.LATIN", where + "西文字体", r.text[:16],
                             lat or "a:latin 未设置")
-=======
-def audit(path, min_size, accent, fonts, latin_fonts, notes_min, tol):
-    issues = []
-    prs = Presentation(path)
-    sw, sh_ = prs.slide_width / EMU_IN, prs.slide_height / EMU_IN
-    allowed = BASE | {accent.upper()}
-    ea_ok = {f.strip() for f in fonts.split(",") if f.strip()}
-    lat_ok = {f.strip() for f in latin_fonts.split(",") if f.strip()}
-
-    for si, slide in enumerate(prs.slides, 1):
-        boxes = []
-
-        def add(kind, detail, extra=""):
-            issues.append((si, kind, detail, extra))
-
-        def check_runs(runs, where):
-            for r in runs:
-                if not r.text.strip():
-                    continue
-                sz = r.font.size.pt if r.font.size else None
-                try:
-                    col = str(r.font.color.rgb)
-                except Exception:
-                    col = "?"
-                floor = 14 if col == "D9D9D9" else min_size   # 页眉页脚档：D9D9D9 专属 14pt 下限
-                if sz is None or sz < floor:
-                    add(where + "字号", r.text[:20], sz)
-                if col not in allowed:
-                    add(where + "颜色", r.text[:20], col)
-                lat, ea = slots(r)
-                if any(is_cjk(c) for c in r.text):
-                    if not ea or (ea_ok and ea not in ea_ok):
-                        add(where + "中文字体", r.text[:16], ea or "a:ea 未设置")
-                if has_latin(r.text):
-                    if lat in CJK_FACES:
-                        add(where + "西文用中文字体", r.text[:16], f"latin={lat}")
-                    elif not lat or (lat_ok and lat not in lat_ok):
-                        add(where + "西文字体", r.text[:16], lat or "a:latin 未设置")
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
                 for ch in r.text:
                     if ch in " \n\t":
                         continue
                     if "０" <= ch <= "９" or "Ａ" <= ch <= "Ｚ" or "ａ" <= ch <= "ｚ":
-<<<<<<< HEAD
                         add("ERROR", "TXT.FULLWIDTH", where + "全角西文", repr(ch),
                             "字母与数字改半角；中文标点不受限")
                     try:
@@ -292,43 +210,19 @@ def audit(path, min_size, accent, fonts, latin_fonts, notes_min, tol):
                 if _el.find(".//" + qn(_tag)) is not None:
                     add("ERROR", "EFF.SHADOW", "阴影/特效", str(getattr(shp, "shape_type", shp)),
                         f"{_tag} 存在，必须删除")
-=======
-                        add(where + "全角西文", repr(ch), "字母与数字改半角；中文标点（，：（））不受限")
-                    try:
-                        ch.encode("gbk")
-                    except UnicodeEncodeError:
-                        add(where + "字形缺失", repr(ch), f"U+{ord(ch):04X} {unicodedata.name(ch,'?')}")
-
-        for shp in slide.shapes:
-            # ── 阴影/特效禁用（机审）：任何元素不得带阴影 ──
-            _el = shp._element
-            for _tag in ("a:outerShdw", "a:innerShdw", "a:prstShdw", "a:reflection", "a:glow"):
-                if _el.find(".//" + qn(_tag)) is not None:
-                    add("阴影/特效", str(getattr(shp, "shape_type", shp)), f"{_tag} 存在，必须删除")
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
                     break
             _st = str(getattr(shp, "shape_type", ""))
             if "AUTO_SHAPE" in _st or "TEXT_BOX" in _st:
                 try:
                     if shp.shadow.inherit:
-<<<<<<< HEAD
                         add("ERROR", "EFF.SHADOW", "阴影未显式关闭", str(shp.shape_type),
                             "生成时须 shadow.inherit=False（写入空 a:effectLst）")
                 except Exception:
                     pass
-=======
-                        add("阴影未显式关闭", str(shp.shape_type),
-                            "生成时须 shadow.inherit=False（写入空 a:effectLst，阻断主题特效继承）")
-                except Exception:
-                    pass
-                # 主题样式引用：effectRef idx>0 指向主题外阴影（默认模板三级特效全是 outerShdw），
-                # 空 effectLst 在 WPS/部分 PowerPoint 下压不住——形状不得携带 effectRef
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
                 _style_el = _el.find(qn("p:style"))
                 if _style_el is not None:
                     _eref = _style_el.find(qn("a:effectRef"))
                     if _eref is not None and _eref.get("idx", "0") not in ("0", "none"):
-<<<<<<< HEAD
                         add("ERROR", "EFF.STYLE_REF", "主题特效引用", str(shp.shape_type),
                             f"effectRef idx={_eref.get('idx')} 指向主题外阴影，须删除 p:style")
             if _el.find(".//" + qn("p:graphicFrame")) is not None:
@@ -340,14 +234,6 @@ def audit(path, min_size, accent, fonts, latin_fonts, notes_min, tol):
                 try:
                     if "outerShdw" in shp.chart._chartSpace.xml:
                         add("ERROR", "EFF.SHADOW", "阴影/特效", "图表", "chartSpace 含 outerShdw")
-=======
-                        add("主题特效引用", str(shp.shape_type),
-                            f"effectRef idx={_eref.get('idx')} 指向主题外阴影，须删除 p:style 只用显式属性")
-            if getattr(shp, "has_chart", False):
-                try:
-                    if "outerShdw" in shp.chart._chartSpace.xml:
-                        add("阴影/特效", "图表", "chartSpace 含 outerShdw，必须删除")
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
                 except Exception:
                     pass
             try:
@@ -355,7 +241,6 @@ def audit(path, min_size, accent, fonts, latin_fonts, notes_min, tol):
                 w, h = shp.width / EMU_IN, shp.height / EMU_IN
                 if (getattr(shp, "rotation", 0) or 0) == 0:
                     if l < -0.01 or t < -0.01 or l + w > sw + 0.01 or t + h > sh_ + 0.01:
-<<<<<<< HEAD
                         add("ERROR", "GEO.OUTSIDE", "越界", f"{shp.shape_type} @({l:.2f},{t:.2f}) {w:.2f}x{h:.2f}",
                             f"页面 {sw:.2f}x{sh_:.2f}")
             except Exception:
@@ -393,12 +278,6 @@ def audit(path, min_size, accent, fonts, latin_fonts, notes_min, tol):
                 meaningful = area > 0.3 or (fill_hex and fill_hex.upper() not in (P["hair"], P["white"]))
                 if meaningful:
                     graphic_shapes += 1
-=======
-                        add("越界", f"{shp.shape_type} @({l:.2f},{t:.2f}) {w:.2f}x{h:.2f}",
-                            f"页面 {sw:.2f}x{sh_:.2f}")
-            except Exception:
-                pass
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 
             if getattr(shp, "has_text_frame", False) and shp.text_frame.text.strip():
                 tf = shp.text_frame
@@ -409,16 +288,11 @@ def audit(path, min_size, accent, fonts, latin_fonts, notes_min, tol):
                     runs = [r.text for r in p.runs]
                     if not runs:
                         continue
-<<<<<<< HEAD
                     size = max((r.font.size.pt if r.font.size else 18) for r in p.runs)
-=======
-                    size = max((r.font.size.pt if r.font.size else min_size) for r in p.runs)
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
                     ls = p.line_spacing if isinstance(p.line_spacing, (int, float)) else 1.0
                     n, longest = wrap_lines("".join(runs), size, bw)
                     need += n * size * max(ls, 1.0) * 1.18
                     if longest > bw * tol:
-<<<<<<< HEAD
                         add("ERROR", "TXT.NOBREAK", "西文不可断行", "".join(runs)[:30],
                             f"最长段 {longest:.0f}pt / 栏宽 {bw:.0f}pt")
                 check_runs([r for p in tf.paragraphs for r in p.runs])
@@ -427,40 +301,21 @@ def audit(path, min_size, accent, fonts, latin_fonts, notes_min, tol):
                         f"需 {need:.0f}pt / 框 {bh:.0f}pt")
                 boxes.append((tf.text[:22].replace("\n", " "), l or 0, t or 0, w or 0, h or 0))
                 tb_boxes.append((l or 0, t or 0, w or 0, h or 0))
-=======
-                        add("西文不可断行", "".join(runs)[:30], f"最长段 {longest:.0f}pt / 栏宽 {bw:.0f}pt")
-                check_runs([r for p in tf.paragraphs for r in p.runs], "")
-                if bh > 0 and need > bh * tol:
-                    add("文本溢出", tf.text[:30].replace("\n", " "), f"需 {need:.0f}pt / 框 {bh:.0f}pt")
-                boxes.append((tf.text[:22].replace("\n", " "), l, t, w, h))
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 
             if getattr(shp, "has_table", False):
                 tb = shp.table
                 tw = sum(c.width for c in tb.columns) / EMU_IN
                 if abs(tw - shp.width / EMU_IN) > 0.05:
-<<<<<<< HEAD
                     add("ERROR", "GEO.TABLE_WIDTH", "表宽不符", f"{tw:.2f} vs {shp.width/EMU_IN:.2f}", "")
                 colw = [c.width / EMU_PT for c in tb.columns]
                 rowhs = [r.height / EMU_PT for r in tb.rows]
                 for ri, row in enumerate(tb.rows):
-=======
-                    add("表宽不符", f"{tw:.2f} vs {shp.width/EMU_IN:.2f}", "")
-                colw = [c.width / EMU_PT for c in tb.columns]
-                rowhs = [r.height / EMU_PT for r in tb.rows]
-                for ri, row in enumerate(tb.rows):
-                    rowh = rowhs[ri]
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
                     for ci, cell in enumerate(row.cells):
                         tf = cell.text_frame
                         if not tf.text.strip():
                             continue
                         if getattr(cell, "is_spanned", False):
-<<<<<<< HEAD
                             continue
-=======
-                            continue        # 合并单元格的从属格：文本与原点格重复，跳过免误报
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
                         span_w = getattr(cell, "span_width", 1) or 1
                         span_h = getattr(cell, "span_height", 1) or 1
                         avail_w = sum(colw[ci:ci + span_w]) - (cell.margin_left + cell.margin_right) / EMU_PT
@@ -469,26 +324,16 @@ def audit(path, min_size, accent, fonts, latin_fonts, notes_min, tol):
                         for p in tf.paragraphs:
                             if not p.runs:
                                 continue
-<<<<<<< HEAD
                             size = max((r.font.size.pt if r.font.size else 16) for r in p.runs)
-=======
-                            size = max((r.font.size.pt if r.font.size else min_size) for r in p.runs)
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
                             ls = p.line_spacing if isinstance(p.line_spacing, (int, float)) else 1.0
                             n, longest = wrap_lines("".join(r.text for r in p.runs), size, avail_w)
                             need += n * size * max(ls, 1.0) * 1.18
                             if longest > avail_w * tol:
-<<<<<<< HEAD
                                 add("ERROR", "TXT.NOBREAK", "表格西文不可断行", tf.text[:24],
                                     f"列{ci} 最长段 {longest:.0f}pt / {avail_w:.0f}pt")
                         if avail_h > 0 and need > avail_h * tol:
                             add("ERROR", "TXT.TABLE_OVERFLOW", "表格文本溢出", tf.text[:24],
                                 f"需 {need:.0f}pt / 行高 {avail_h:.0f}pt（会撑高压到下方图形）")
-=======
-                                add("表格西文不可断行", tf.text[:24], f"列{ci} 最长段 {longest:.0f}pt / {avail_w:.0f}pt")
-                        if avail_h > 0 and need > avail_h * tol:
-                            add("表格文本溢出", tf.text[:24], f"需 {need:.0f}pt / 行高 {avail_h:.0f}pt（会撑高压到下方图形）")
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
                         check_runs([r for p in tf.paragraphs for r in p.runs], "表格")
 
         for i in range(len(boxes)):
@@ -500,21 +345,16 @@ def audit(path, min_size, accent, fonts, latin_fonts, notes_min, tol):
                     area = ox * oy
                     small = min(a[3] * a[4], b[3] * b[4])
                     if small > 0 and area / small > 0.18:
-<<<<<<< HEAD
                         add("ERROR", "TXT.OVERLAP", "文本重叠", f"[{a[0]}] x [{b[0]}]",
                             f"覆盖 {area/small*100:.0f}%")
 
         if smartart and not allow_smartart:
             add("ERROR", "MED.SMARTART", "禁用对象", f"{smartart} 个 SmartArt",
                 "用普通形状/表格/图表表达；模板沿用需 --allow-smartart")
-=======
-                        add("文本重叠", f"[{a[0]}] x [{b[0]}]", f"覆盖 {area/small*100:.0f}%")
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 
         notes = ""
         if slide.has_notes_slide:
             notes = slide.notes_slide.notes_text_frame.text.strip()
-<<<<<<< HEAD
         if note_sev and len(notes) < n_min:
             add(note_sev, "NOTE.SHORT", "逐字稿过短", f"{len(notes)} 字 < {n_min}",
                 "备注写约 1 分钟逐字稿 + 口径备答")
@@ -566,17 +406,11 @@ def format_layout(rows):
     for si, rel, sk, means, pt in rows:
         lines.append(f"  {si:>2}  {rel:<4}  {sk:<6}  {means:<6}  {'是' if pt else '否'}")
     return "\n".join(lines)
-=======
-        if len(notes) < notes_min:
-            add("备注缺失/过短", "逐字稿", f"{len(notes)} 字 < {notes_min}")
-    return issues
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("files", nargs="*")
-<<<<<<< HEAD
     ap.add_argument("--tier", default="balanced", choices=("fast", "balanced", "strict"))
     ap.add_argument("--preset", default="A")
     ap.add_argument("--fonts", default=None)
@@ -584,14 +418,6 @@ def main():
     ap.add_argument("--notes-min", type=int, default=None)
     ap.add_argument("--overflow-tol", type=float, default=1.06)
     ap.add_argument("--allow-smartart", action="store_true")
-=======
-    ap.add_argument("--min-size", type=float, default=16)
-    ap.add_argument("--accent", default="0072B2")
-    ap.add_argument("--fonts", default="宋体,楷体,黑体,微软雅黑", help="中文字体（a:ea）白名单")
-    ap.add_argument("--latin-fonts", default="Arial,Times New Roman", help="西文字体（a:latin）白名单")
-    ap.add_argument("--notes-min", type=int, default=150)
-    ap.add_argument("--overflow-tol", type=float, default=1.06)
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
     a = ap.parse_args()
     if not a.files:
         print(__doc__); return 2
@@ -599,7 +425,6 @@ def main():
     for path in a.files:
         if not os.path.exists(path):
             print("文件不存在:", path); rc = 1; continue
-<<<<<<< HEAD
         issues, _ = audit(path, tier=a.tier, preset=a.preset, fonts=a.fonts,
                           latin_fonts=a.latin_fonts, notes_min=a.notes_min,
                           tol=a.overflow_tol, allow_smartart=a.allow_smartart)
@@ -607,14 +432,6 @@ def main():
             rc = 1
             print("FAIL", os.path.basename(path), f"({len(issues)} 项)")
             print(format_findings(issues[:40]))
-=======
-        issues = audit(path, a.min_size, a.accent, a.fonts, a.latin_fonts, a.notes_min, a.overflow_tol)
-        if issues:
-            rc = 1
-            print("FAIL", os.path.basename(path), f"({len(issues)} 项)")
-            for it in issues[:40]:
-                print("   ", it)
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
             if len(issues) > 40:
                 print("    ...另", len(issues) - 40, "项")
         else:
@@ -622,9 +439,5 @@ def main():
     return rc
 
 
-<<<<<<< HEAD
 if __name__ == "__main__":
     sys.exit(main())
-=======
-sys.exit(main())
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552

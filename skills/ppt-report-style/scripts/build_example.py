@@ -2,11 +2,7 @@
 """生成 6 页示例 assets/example-slide.pptx（封面 / 章节页 / 左文右图 / 表格 / 四宫格 / 收束页）。
 画布 13.33 x 7.5 in（PowerPoint 默认 16:9），页面骨架网格由 14.06 x 7.91 版按 0.948 等比换算。
 示例内容为"歌声质量评估模型调研"虚构主题，全部数值为虚构占位数据，不含任何真实项目材料。"""
-<<<<<<< HEAD
 import os, sys, argparse, struct, zlib
-=======
-import os, sys
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 sys.stdout.reconfigure(encoding="utf-8")
 from pptx import Presentation
 from pptx.util import Inches, Pt
@@ -19,7 +15,6 @@ from pptx.oxml.ns import qn, nsdecls
 from pptx.oxml import parse_xml
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-<<<<<<< HEAD
 _ap = argparse.ArgumentParser()
 _ap.add_argument("out", nargs="?", default=os.path.join(HERE, "..", "assets", "example-slide.pptx"),
                  help="输出路径（兼容旧用法：位置参数）")
@@ -37,12 +32,6 @@ _PRESET = _get_preset(_a.preset)
 # 文字对比度全部 ≥4.5:1：墨 21:1 / 次级灰 6E6E6E 5.1:1 / 点缀蓝 0072B2 5.2:1
 ACC=_PRESET["accent"]; BLACK=_PRESET["ink"]; MUTED=_PRESET["muted"]
 HAIR=_PRESET["hair"]; BAR=_PRESET["chart_neutral"]; WHITE=_PRESET["white"]
-=======
-OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "assets", "example-slide.pptx")
-# 配色：Okabe-Ito（Wong palette，Nature Methods 2011）成套学术色板 + 中性灰脚手架
-# 文字对比度全部 ≥4.5:1：黑 21:1 / 次级灰 6E6E6E 5.1:1 / 点缀蓝 0072B2 5.2:1
-ACC="0072B2"; BLACK="000000"; MUTED="6E6E6E"; HAIR="D9D9D9"; BAR="BFBFBF"; WHITE="FFFFFF"
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 HEI="黑体"; KAI="楷体"; SONG="宋体"
 # 默认学术风：正文宋体 + 标题黑体；西文正文配 Times New Roman，黑体标题内西文配 Arial。
 # 微软雅黑保留在白名单，作为企业/演示场合的可选方案。
@@ -105,15 +94,6 @@ def conclusion(sl, segs):
     rect(sl,ML,6.15,CW,0.01,fill=HAIR)
     text(sl,ML,6.27,CW,0.44,[segs],18,anchor=MSO_ANCHOR.MIDDLE,ls=1.1)   # 与页脚线保持 0.29in 距离
 
-<<<<<<< HEAD
-=======
-def band_block(sl,l,t,w,h,paras,size,face=SONG,color=BLACK,ls=1.2):
-    """浅底强调块：F1F5F8 底 + 左侧主题色竖条。"""
-    rect(sl,l,t,w,h,fill=BAND); rect(sl,l,t,0.045,h,fill=ACC)
-    text(sl,l+0.21,t,w-0.42,h,paras,size,anchor=MSO_ANCHOR.MIDDLE,ls=ls)
-    return
-
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 def chart_cn_font(ch):
     cs = ch._chartSpace
     for rPr in cs.iter(qn("a:defRPr")):
@@ -153,11 +133,7 @@ footer(s2,"02 / 06")
 text(s2,ML,2.20,3.00,0.60,[("01",MUTED,HEI)],36)
 text(s2,ML,3.30,7.20,0.80,[("调研范围与方法",BLACK,HEI)],36)
 text(s2,ML,4.50,5.90,1.70,
-<<<<<<< HEAD
     [[("检索 Web of Science 与 arXiv（检索口径），时间窗 2022-2026；纳入标准：以歌声质量为评估对象、报告与人工评分一致性指标的实证研究。",BLACK,KAI)]],
-=======
-    [[("检索 Web of Science 与 arXiv（示例口径），时间窗 2022-2026；纳入标准：以歌声质量为评估对象、报告与人工评分一致性指标的实证研究。",BLACK,KAI)]],
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
     20,ls=1.35)
 rect(s2,7.90,2.30,0.01,1.70,fill=HAIR)   # 导航分隔发丝线
 text(s2,8.30,2.30,4.50,0.44,[("01  调研范围与方法",ACC,HEI)],18,anchor=MSO_ANCHOR.MIDDLE)
@@ -216,11 +192,7 @@ va.tick_labels.number_format='0.00'; va.tick_labels.number_format_is_linked=Fals
 va.format.line.fill.background()
 chart_cn_font(ch)
 text(s3,7.44,5.20,5.37,0.80,[[("图注：SSL 路线一致性最高（LCC 0.86）。",MUTED,SONG)],
-<<<<<<< HEAD
     [("数值轴 0.60-0.90，截断显示",MUTED,SONG)]],16,ls=1.25)
-=======
-    [("数值轴 0.60-0.90，截断显示 · 示例数据",MUTED,SONG)]],16,ls=1.25)
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 s3.notes_slide.notes_text_frame.text = """【左文右图正文页 · 讲稿】
 本页约一分钟，节奏是：三条实证逐条讲，判断行收束。
 三条实证都是"指标名 + 数值 + 口径"写在同一句里：篇数 24、最优 LCC 0.86、开源占比 37.5%。
@@ -314,7 +286,6 @@ s6.notes_slide.notes_text_frame.text = """【收束页 · 讲稿】
 备答：下阶段计划的三步各自的时间点与人力安排写进备注，页面上只保留一句话版本。
 如果被追问"复现 9 个仓库要多久"，口头回答按每周两个估算约需一个多月，具体排期会后单独同步，页面上不展开。"""
 
-<<<<<<< HEAD
 def _png_bytes(width, height, rgb=(200, 60, 60)):
     """纯 stdlib 生成小尺寸 PNG（用于回归反例的低分辨率配图）。"""
     def chunk(tag, data):
@@ -420,7 +391,5 @@ if VARIANT == "negative":
     build_negative(OUT)
     sys.exit(0)
 
-=======
->>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 prs.save(OUT)
 print("saved", os.path.normpath(OUT))
