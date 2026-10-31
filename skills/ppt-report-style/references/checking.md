@@ -1,6 +1,6 @@
 # PPT 检查与交付规则
 
-规则阈值只在 `references/profiles.json` 与 SKILL.md 定义，检查脚本实现这些阈值；本文件规定分级、协议和交付方式。严重度按档位分治（fast 多数降为建议；balanced/strict 从严），同一规则在不同档位可能是 ERROR 或 WARNING——以脚本输出为准。
+规则阈值只在 `references/profiles.json` 与 SKILL.md 定义，检查脚本实现这些阈值；本文件规定分级、协议和交付方式。严重度按档位分治：fast 档只有字体槽降为警告、黑体加粗降为建议，备注下限与骨架重复不检查；溢出、越界、阴影、分辨率、缺图等安全类规则在任何档位都不降级。balanced/strict 从严，同一规则在不同档位可能是 ERROR 或 WARNING——以脚本输出为准。
 
 ## 检查结果分级
 
@@ -22,7 +22,6 @@
 需要人工确认，不自动判定失败：
 
 - 连续三页使用同一主骨架、纯文字页比例偏高、方块矩阵页过半；
-- 对比色或辅助色面积超过建议值；
 - 图片分辨率偏低、长边像素不足、可能与文字重叠；
 - 主题字体、继承颜色无法可靠解析；
 - HTML 近似预览与 PowerPoint 最终渲染可能不同；
@@ -56,7 +55,7 @@
 | `IMG.` | 配图 | `IMG.RES` 按放置尺寸分辨率不足（<96dpi ERROR，<150dpi WARNING）、`IMG.MISSING` 图片数据无法读取（WARNING）、`IMG.QUALITY` 长边像素过低（WARNING） |
 | `EFF.` | 效果 | `EFF.SHADOW` 阴影/特效、`EFF.STYLE_REF` 主题特效引用（effectRef） |
 | `MED.` | 媒体与对象 | `MED.SMARTART` 禁用对象 |
-| `NOTE.` | 备注 | `NOTE.SHORT` 逐字稿过短（档位分治） |
+| `NOTE.` | 备注 | `NOTE.SHORT` 逐字稿过短（档位分治；封面/章节页按 ≥36pt 标题识别豁免） |
 
 ## 统一结果协议
 

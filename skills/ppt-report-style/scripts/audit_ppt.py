@@ -382,9 +382,11 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
             add("ERROR", "MED.SMARTART", "禁用对象", f"{smartart} 个 SmartArt",
                 "用普通形状/表格/图表表达；模板沿用需 --allow-smartart")
 
-        if note_sev and len(notes) < n_min:
+        # 封面/章节页（存在 ≥36pt 标题）按实际讲解需要写备注，不适用字数下限；
+        # 与 LAY.MEANS / 纯文字页比例的页型豁免同一判定口径。
+        if note_sev and len(notes) < n_min and max_size < 36:
             add(note_sev, "NOTE.SHORT", "逐字稿过短", f"{len(notes)} 字 < {n_min}",
-                "备注写约 1 分钟逐字稿 + 口径备答")
+                "备注写约 1 分钟逐字稿 + 口径备答（封面/章节页豁免）")
 
         skeleton = _classify_skeleton(tb_boxes, chart_boxes, table_boxes, pic_boxes, sw, sh_)
         pure_text = not (chart_boxes or table_boxes or pic_boxes) and graphic_shapes == 0

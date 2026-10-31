@@ -1,6 +1,6 @@
 {
-  "$comment": "ppt-report-style 唯一阈值真相源（v0.4.1）。任何文档或脚本与本文件冲突时，以本文件为准。三档严格度 × 四套配色预设。",
-  "version": "0.4.1",
+  "$comment": "ppt-report-style 唯一阈值真相源（v0.4.4）。任何文档或脚本与本文件冲突时，以本文件为准。三档严格度 × 四套配色预设。",
+  "version": "0.4.4",
   "tiers": {
     "fast": {
       "label": "L1 快速档",
@@ -23,7 +23,6 @@
       "skeleton_repeat_severity": null,
       "skeleton_repeat_min_slides": 0,
       "pure_text_ratio": null,
-      "area_quotas": false,
       "font_slot_severity": "WARNING"
     },
     "balanced": {
@@ -47,7 +46,6 @@
       "skeleton_repeat_severity": "WARNING",
       "skeleton_repeat_min_slides": 6,
       "pure_text_ratio": 0.3,
-      "area_quotas": true,
       "font_slot_severity": "ERROR"
     },
     "strict": {
@@ -71,7 +69,6 @@
       "skeleton_repeat_severity": "SUGGESTION",
       "skeleton_repeat_min_slides": 10,
       "pure_text_ratio": 0.6,
-      "area_quotas": false,
       "font_slot_severity": "ERROR"
     }
   },

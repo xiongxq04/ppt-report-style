@@ -29,8 +29,8 @@ NEUTRAL_KNOWN = ("000000", "1A1A1A", "333333", "595959", "808080", "A6A6A6", "D9
 NEUTRAL_MAX_SPREAD = 8      # 同一颜色 rgb 最大最小差 <= 8 视为灰阶
 MAX_HUE_GROUPS = 3          # 单页允许的色相组数（不含黑白灰）
 
-RATIO_BODY = 4.5            # 正文对比度下限
-RATIO_LARGE = 3.0           # 大字与图形边界对比度下限
+RATIO_BODY = 4.5            # 正文对比度下限（机审唯一口径，大字同样适用）
+RATIO_LARGE = 3.0           # 仅人工判读大字与图形边界用，不参与机审放行
 LARGE_PT = 18.0             # WCAG 大字口径
 LARGE_BOLD_PT = 14.0
 
@@ -208,7 +208,9 @@ def main():
     if args.contrast:
         ratio = contrast_ratio(args.contrast[0], args.contrast[1])
         print(f"#{normalize_hex(args.contrast[0])} 与 #{normalize_hex(args.contrast[1])} 对比度 {ratio:.2f}:1")
-        print("正文达标" if ratio >= RATIO_BODY else ("仅大字达标" if ratio >= RATIO_LARGE else "不达标"))
+        print("正文达标（机审口径 ≥4.5:1）" if ratio >= RATIO_BODY else
+              ("仅达 3:1 人工判读档（大字/图形边界），机审不放行"
+               if ratio >= RATIO_LARGE else "不达标"))
         return 0
     if args.scale:
         print(custom_scale_report(args.scale))
