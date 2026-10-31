@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
+<<<<<<< HEAD
 """回归测试：正例必须零错误零警告，反例必须命中全部预期规则。
+=======
+"""回归测试：正例必须干净，反例必须被检出指定规则。
+>>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 
 用法:
   python run_regression.py            # 运行全部检查
@@ -7,17 +11,25 @@
 退出码非 0 表示回归失败。
 """
 import argparse
+<<<<<<< HEAD
+=======
+import json
+>>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 import os
 import subprocess
 import sys
 import tempfile
 
+<<<<<<< HEAD
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+=======
+>>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 sys.stdout.reconfigure(encoding="utf-8")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL_ROOT = os.path.normpath(os.path.join(HERE, ".."))
 
+<<<<<<< HEAD
 # 反例（--variant negative）在 balanced 档下必须命中的规则；新增机审规则时同步扩充。
 EXPECTED_NEGATIVE_RULES = (
     "TYP.MINSIZE", "TYP.LADDER", "TYP.POSTER",
@@ -25,6 +37,11 @@ EXPECTED_NEGATIVE_RULES = (
     "FONT.EA", "FONT.LATIN_CJK", "FONT.TABLE_KAI", "FONT.EA_BOLD",
     "TXT.PREFIX", "TXT.CAVEAT", "TXT.OVERFLOW", "TXT.GLYPH",
     "IMG.RES", "LAY.REPEAT", "LAY.PURETEXT",
+=======
+EXPECTED_NEGATIVE_RULES = (
+    "TYP.MINSIZE", "PAL.COLOR", "PAL.CONTRAST", "FONT.EA",
+    "TXT.OVERFLOW", "TXT.GLYPH", "IMG.RES", "LAY.REPEAT", "LAY.PURETEXT",
+>>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
 )
 
 
@@ -34,24 +51,36 @@ def run(args):
     return completed.returncode, (completed.stdout or "") + (completed.stderr or "")
 
 
+<<<<<<< HEAD
 def check_deck(path, tier, report_path, preset="A"):
     args = [os.path.join(HERE, "check_ppt.py"), path, "--tier", tier, "--preset", preset,
             "--json", report_path]
     code, output = run(args)
     import json
+=======
+def check_deck(path, mode, report_path, extra=None):
+    args = [os.path.join(HERE, "check_ppt.py"), path, "--mode", mode, "--json", report_path]
+    args.extend(extra or [])
+    code, output = run(args)
+>>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
     with open(report_path, encoding="utf-8") as handle:
         return code, output, json.load(handle)
 
 
 def main():
     parser = argparse.ArgumentParser()
+<<<<<<< HEAD
     parser.add_argument("--keep", action="store_true", help="保留生成的临时文件")
+=======
+    parser.add_argument("--keep", action="store_true", help="保留临时文件")
+>>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
     args = parser.parse_args()
 
     temp_dir = tempfile.mkdtemp(prefix="ppt-regression-")
     failures = []
     print("回归测试目录:", temp_dir)
 
+<<<<<<< HEAD
     positive = os.path.join(temp_dir, "positive.pptx")
     code, output = run([os.path.join(HERE, "build_example.py"), positive])
     if code != 0:
@@ -92,13 +121,42 @@ def main():
 
     negative = os.path.join(temp_dir, "negative.pptx")
     code, output = run([os.path.join(HERE, "build_example.py"), negative, "--variant", "negative"])
+=======
+    positive = os.path.join(SKILL_ROOT, "assets", "example-slide.pptx")
+    code, output = run([os.path.join(HERE, "build_example.py")])
+    if code != 0:
+        failures.append("正例生成失败：" + output.strip()[:200])
+    print("[1/4] 重建正例", "OK" if code == 0 else "FAIL")
+
+    for mode in ("balanced", "strict"):
+        report = os.path.join(temp_dir, f"positive-{mode}.json")
+        code, output, data = check_deck(positive, mode, report)
+        counts = data["counts"]
+        ok = counts["ERROR"] == 0 and counts["WARNING"] == 0
+        print(f"[2/4] 正例 {mode}: {counts['ERROR']} 错误 / {counts['WARNING']} 警告 / "
+              f"{counts['SUGGESTION']} 建议", "OK" if ok else "FAIL")
+        if not ok:
+            failures.append(f"正例 {mode} 不干净：\n" + output.strip()[:800])
+        if len(data["layout"]) != 9:
+            failures.append("正例页数与预期不一致")
+        relations = {row["relation"] for row in data["layout"]}
+        if len(relations) < 4:
+            failures.append(f"正例关系模型不足：{relations}")
+
+    negative = os.path.join(temp_dir, "negative.pptx")
+    code, output = run([os.path.join(HERE, "build_example.py"), "--variant", "negative", "--out", negative])
+>>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
     if code != 0:
         failures.append("反例生成失败：" + output.strip()[:200])
     report = os.path.join(temp_dir, "negative.json")
     code, output, data = check_deck(negative, "balanced", report)
     found = {item["rule"] for item in data["findings"]} | {item["rule"] for item in data["exceptions"]}
     missing = sorted(set(EXPECTED_NEGATIVE_RULES) - found)
+<<<<<<< HEAD
     print("[3/4] 反例检出", "OK" if not missing else "FAIL", "缺失规则:", missing or "无")
+=======
+    print("[3/4] 反例检出", "OK" if not missing else "FAIL", "缺失规则:" , missing or "无")
+>>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
     print("       检出规则:", "、".join(sorted(found)))
     if missing:
         failures.append("反例未被检出：" + "、".join(missing))
@@ -107,7 +165,11 @@ def main():
 
     preview = os.path.join(temp_dir, "preview.html")
     code, output = run([os.path.join(HERE, "preview_ppt.py"), positive, preview])
+<<<<<<< HEAD
     ok = code == 0 and os.path.exists(preview) and os.path.getsize(preview) > 1500
+=======
+    ok = code == 0 and os.path.exists(preview) and os.path.getsize(preview) > 5000
+>>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
     print("[4/4] 预览生成", "OK" if ok else "FAIL")
     if not ok:
         failures.append("预览生成失败：" + output.strip()[:200])
@@ -121,12 +183,20 @@ def main():
     print("回归全部通过：正例零错误零警告，反例命中全部预期规则。")
     if not args.keep:
         for name in os.listdir(temp_dir):
+<<<<<<< HEAD
             path = os.path.join(temp_dir, name)
             if os.path.isfile(path):
                 os.remove(path)
+=======
+            os.remove(os.path.join(temp_dir, name))
+>>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
         os.rmdir(temp_dir)
     return 0
 
 
 if __name__ == "__main__":
+<<<<<<< HEAD
     raise SystemExit(main())
+=======
+    raise SystemExit(main())
+>>>>>>> 5fc39cf9c0c9cf16c787045ee50c32d99c021552
