@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.4.3（2026-10-31）—— 全库审计修复：机审盲洞补齐 + 文档漂移清零
+
+> 背景：对 SKILL.md、9 个 references、8 个脚本、CI 做全量交叉审计（文档 ↔ 代码 ↔ profiles.json 三方），按审计结论逐项修复。
+
+### 修复（功能性 bug）
+- **`--fonts`/`--latin-fonts` 逗号串从未被拆分**：白名单被逐字迭代成单字集合，传参与默认等价的白名单也会炸出 FONT.EA。`profile_lib.expand_font_whitelist()` 统一拆分 + 中英文别名展开（宋体↔SimSun、黑体↔SimHei 等），audit/verify/check 三入口全修。
+- **备注级例外 `[例外:规则名]` 落地**：此前只存在于提示文字，从未被解析。现在 `profile_lib.note_exception_rules()` 在 audit/verify 两端解析备注标记，命中规则的发现降级为「例外」并保留可追溯（LAY.REPEAT 同样支持）；全片级规则（TXT.PREFIX/CAVEAT/LAY.PURETEXT）仍走 `--exceptions` JSON。
+- **check_ppt 合并去重确定性化**：audit 与 verify 对同一发现的两种措辞按 (页码, 规则, 对象) 去重，替代原先的 set() 无序合并。
+- **HF 页眉页脚几何区按页高等比缩放**：非标画布不再失准（`is_hf_zone` 增加 page_h 参数）。
+
+### 机审盲洞补齐
+- **PAL.CONTRAST 按实际底色判定**：此前只对纯白底算，淡卡片上的文字对比度无人查。现在取文字形状自身 solid 填充为底色，否则回溯 z 序下方最近填充形状；文字压图片上底色不可判定时跳过（由 GEO.OVERLAP_VISUAL 兜底）。白字对白底不再豁免（1:1 必报）。
+- **PAL.HUE 纳入形状填充与图表系列色**：此前只统计文字色，彩虹图表页照样过「色相 ≤3 组」。
+- **幽灵规则落地**：`IMG.MISSING`（图片数据无法读取，WARNING）、`IMG.QUALITY`（长边 <800px，WARNING）、`GEO.OVERLAP_VISUAL`（图片压文字 >18%，WARNING）、`LAY.MEANS`（纯文字页仅一档字号，SUGGESTION；封面/章节页豁免）——四条文档承诺、脚本未实现，现已实现并回写 checking.md 规则表。
+- **字号继承降为警告**：run 未显式设字号从 TYP.MINSIZE ERROR 改为 `TYP.INHERIT` WARNING，与 PAL.INHERIT（颜色继承警告）口径一致，模板跟随场景不再被打穿。
+- **黑体加粗检查覆盖 SimHei**；中文字体白名单接受中英文名。
+
+### 文档漂移清零
+- SKILL.md 硬性限制节声明"色值为预设 A 举例，换预设整体替换"，图表配色处改为预设相对表述；验收清单补 TYP.INHERIT、PAL.CONTRAST 实际底色口径。
+- style-rules.md「默认门槛 150 字/页」改为按档位（balanced 90 / strict 150）；字阶"6 档/7 档"口径统一。
+- workflow.md 与 checking.md 的 git 矛盾调和：提交前说明改动、push 需用户明确要求；workflow 预设表述补 D。
+- workflow.md 阶段 0「换 B/C」补 D；阶段 4 token 硬编码改预设相对表述。
+- checking.md 例外机制如实描述备注标记与折叠规则（同页同规则 ≤3 条，`--max-per-rule`）。
+- visual-means.md LAY.MEANS 措辞与实现对齐。
+
+### 其他
+- **CI**：预设自检改为动态遍历全部预设；示例语义比对中的点缀色从 profiles.json 读取（不再硬编码 0072B2）。
+- **palette_utils.py 瘦身**：删除 v0.3 遗留的 THEME/CONTRAST/SUPPORT 色阶、`family_of()` 模糊匹配与死代码 `report()`；`--scale` 派生输出增加文字可用性标注。
+- **eval-queries.json** 扩至 32 条（补预设 D 与色板库触发用例）。
+- 审计结论中「LAY.REPEAT 报错页码 off-by-one」经推演复核为**误报**（原实现报告的是重复段最后一页），未改动。
+
 ## v0.4.2（2026-10-31）—— layout-patterns.md 并入学术海报版式的可迁移经验
 
 ### 新增

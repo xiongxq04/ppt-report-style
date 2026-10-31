@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """配色系统工具：对比度、色相分组、色阶派生与预设自检。
 
-预设配色（A/B/C）的权威定义在 references/profiles.json；本模块是它的可执行实现，
-另保留 generate_scale() 作为自定义色阶派生工具（模板跟随场景用）。
+预设配色（A/B/C/D）的权威定义在 references/profiles.json；本模块是它的可执行实现，
+另保留 generate_scale() 作为自定义色阶派生工具（模板跟随与色板库晋升场景用）。
 
 自检:
-  python palette_utils.py --check            # 自检 + 预设 A/B/C 对比度表
+  python palette_utils.py --check            # 自检 + 预设 A 对比度表
   python palette_utils.py --check --preset B
 其他用法:
   python palette_utils.py --contrast 0072B2 FFFFFF
@@ -22,30 +22,17 @@ from profile_lib import get_preset, preset_names, preset_all_colors
 
 # —— 默认点缀色（= 预设 A 的 accent）——
 ACCENT_DEFAULT = "0072B2"
-# 色阶派生工具的演示数据（generate_scale 输入/输出示例，不是可用色清单）
-THEME_SCALE = ("142129", "1E303B", "283E4E", "4A6577", "8199A8", "B7C7D2", "E4EBF0")
-CONTRAST_SCALE = ("8C5A16", "B4771F", "C98B2E", "E0B15B")
-SUPPORT_SCALE = ("2F4E48", "4F7C74", "8DB0A8", "D6E5E1")
+
 NEUTRAL_KNOWN = ("000000", "1A1A1A", "333333", "595959", "808080", "A6A6A6", "D9D9D9",
                  "F1F5F8", "F2F2F2", "FFFFFF")
 
-FAMILIES = ("theme", "contrast", "support")
-FAMILY_LABEL = {"neutral": "中性色", "theme": "主题色", "contrast": "对比色",
-                "support": "辅助色", "unknown": "方案外颜色"}
-
 NEUTRAL_MAX_SPREAD = 8      # 同一颜色 rgb 最大最小差 <= 8 视为灰阶
-FAMILY_TOLERANCE = 60.0     # 与色阶成员的 RGB 距离容差
 MAX_HUE_GROUPS = 3          # 单页允许的色相组数（不含黑白灰）
 
 RATIO_BODY = 4.5            # 正文对比度下限
 RATIO_LARGE = 3.0           # 大字与图形边界对比度下限
 LARGE_PT = 18.0             # WCAG 大字口径
 LARGE_BOLD_PT = 14.0
-
-ACCENT_AREA_WARN = 0.10     # 对比色面积提醒线
-ACCENT_AREA_MAX = 0.20
-SUPPORT_AREA_WARN = 0.20    # 辅助色面积提醒线
-SUPPORT_AREA_MAX = 0.35
 
 
 def normalize_hex(value, default=None):
@@ -87,35 +74,6 @@ def is_neutral(value):
     if raw in NEUTRAL_KNOWN:
         return True
     return spread(raw) <= NEUTRAL_MAX_SPREAD
-
-
-def _distance(first, second):
-    a, b, c = hex_to_rgb(first)
-    x, y, z = hex_to_rgb(second)
-    return ((a - x) ** 2 + (b - y) ** 2 + (c - z) ** 2) ** 0.5
-
-
-def family_of(value, accent=None, contrast=None, support=None):
-    raw = normalize_hex(value)
-    if raw is None:
-        return "unknown"
-    if is_neutral(raw):
-        return "neutral"
-    palette = {
-        "theme": set(THEME_SCALE) | ({normalize_hex(accent, ACCENT_DEFAULT)} if accent else set()),
-        "contrast": set(CONTRAST_SCALE) | ({normalize_hex(contrast)} if contrast else set()),
-        "support": set(SUPPORT_SCALE) | ({normalize_hex(support)} if support else set()),
-    }
-    for name in FAMILIES:
-        if raw in palette[name]:
-            return name
-    best, best_distance = "unknown", None
-    for name in FAMILIES:
-        for member in palette[name]:
-            distance = _distance(raw, member)
-            if best_distance is None or distance < best_distance:
-                best, best_distance = name, distance
-    return best if best_distance is not None and best_distance <= FAMILY_TOLERANCE else "unknown"
 
 
 def relative_luminance(value):
@@ -194,26 +152,11 @@ def generate_scale(base, steps=7):
 
 def describe(value):
     raw = normalize_hex(value, "000000")
-    family = family_of(raw)
     hue, saturation, lightness = hsl(raw)
-    return (f"#{raw} {FAMILY_LABEL[family]} 色相 {hue:.0f}度 饱和 {saturation:.2f} 明度 {lightness:.2f} "
-            f"白底对比 {contrast_ratio(raw, 'FFFFFF'):.2f}:1")
-
-
-def report(accent=ACCENT_DEFAULT):
-    lines = [f"主题色：#{normalize_hex(accent, ACCENT_DEFAULT)}",
-             "主题色阶：" + " ".join(f"#{item}" for item in THEME_SCALE),
-             "对比色阶：" + " ".join(f"#{item}" for item in CONTRAST_SCALE),
-             "辅助色阶：" + " ".join(f"#{item}" for item in SUPPORT_SCALE),
-             "中性色　：黑白灰不计入配色额度",
-             "",
-             f"{'色值':<9}{'族':<7}{'白底对比':>9}{'正文4.5':>9}{'大字3.0':>9}"]
-    for item in list(THEME_SCALE) + list(CONTRAST_SCALE) + list(SUPPORT_SCALE):
-        lines.append(f"#{item:<8}{FAMILY_LABEL[family_of(item)]:<7}"
-                     f"{contrast_ratio(item, 'FFFFFF'):>8.2f}"
-                     f"{'是' if text_safe(item) else '否':>8}"
-                     f"{'是' if contrast_ratio(item, 'FFFFFF') >= RATIO_LARGE else '否':>8}")
-    return "\n".join(lines)
+    tag = " 中性" if is_neutral(raw) else ""
+    return (f"#{raw}{tag} 色相 {hue:.0f}度 饱和 {saturation:.2f} 明度 {lightness:.2f} "
+            f"白底对比 {contrast_ratio(raw, 'FFFFFF'):.2f}:1"
+            f"{' ≥4.5 可作文字' if text_safe(raw) else ' 仅图形/填充'}")
 
 
 def custom_scale_report(base):
@@ -244,7 +187,7 @@ def self_check(name="A"):
     assert abs(contrast_ratio("000000", "FFFFFF") - 21.0) < 0.01
     assert is_neutral("F1F5F8") and is_neutral("000000") and is_neutral("808080")
     assert not is_neutral("0072B2") and not is_neutral("A63603")
-    # 三套预设的文字 token 必须全部达到正文对比度门槛（hair/white 除外）
+    # 全部预设的文字 token 必须达到正文对比度门槛（hair/white 除外）
     for key in preset_names():
         p = get_preset(key)
         for role in ("ink", "muted", "accent", "accent_deep"):

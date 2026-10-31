@@ -24,14 +24,53 @@ try:
 except ImportError:
     print("需要 python-pptx：pip install python-pptx"); sys.exit(2)
 
-from profile_lib import get_tier, get_preset, preset_colors, accent_family, is_hf_zone
+from profile_lib import (get_tier, get_preset, preset_colors, accent_family, is_hf_zone,
+                         expand_font_whitelist, note_exception_rules)
 from palette_utils import contrast_ratio, hue_group, is_neutral, normalize_hex
 
 CJK_FACES = {"宋体", "楷体", "黑体", "SimSun", "KaiTi", "SimHei", "MS Mincho", "Microsoft YaHei"}
+HEI_FACES = {"黑体", "SimHei"}   # 黑体不再叠加粗体（合成粗糊边）
 PREFIXES = ("结论：", "判断：", "收束：")
 CAVEAT_WORDS = ("虚构", "示例")
 EMU_IN = 914400.0
 BASE_NEUTRAL = {"000000", "FFFFFF"}
+
+
+def _solid_fill_hex(shape):
+    """形状的 solid 填充色（大写 HEX）；无填充或不支持时返回 None。"""
+    try:
+        if shape.fill.type == 1:      # MSO_FILL.SOLID
+            return normalize_hex(str(shape.fill.fore_color.rgb))
+    except Exception:
+        pass
+    return None
+
+
+def _effective_bg(shape, order, fills, pic_rects=(), default="FFFFFF"):
+    """文字的实际底色：自身 solid 填充优先；否则取文档序在先、盖住文字中心的
+    最近一个非白填充形状（z 序 = 文档序，后者在上）。找不到则按白底。
+    文字压在图片上时底色不可判定，返回 None（跳过对比度检查，由 GEO.OVERLAP_VISUAL 兜底）。"""
+    own = _solid_fill_hex(shape)
+    if own and own != default:
+        return own
+    try:
+        cl = shape.left / EMU_IN
+        ct = shape.top / EMU_IN
+        cw = shape.width / EMU_IN
+        ch = shape.height / EMU_IN
+    except Exception:
+        return default
+    cx, cy = cl + cw / 2, ct + ch / 2
+    for pl, pt_, pw, ph in pic_rects:
+        if pl <= cx <= pl + pw and pt_ <= cy <= pt_ + ph:
+            return None
+    bg = default
+    for f_order, fl, ft, fw, fh, fx in fills:
+        if f_order >= order or fx == default:
+            continue
+        if fl <= cx <= fl + fw and ft <= cy <= ft + fh:
+            bg = fx
+    return bg
 
 
 def _finding(severity, slide, rule, kind, detail, extra=""):
@@ -128,8 +167,8 @@ def check(path, tier="balanced", preset="A",
         P["accent"] = normalize_hex(accent, P["accent"])
     allowed = preset_colors(P) | set(BASE_NEUTRAL) | {c.upper() for c in (allow or []) if c.strip()}
     accent_set = accent_family(P)
-    ea_ok = {f for f in (fonts if fonts is not None else (T["fonts"] or [])) if f}
-    lat_ok = {f for f in (latin_fonts if latin_fonts is not None else (T["latin_fonts"] or [])) if f}
+    ea_ok = expand_font_whitelist(fonts if fonts is not None else (T["fonts"] or []))
+    lat_ok = expand_font_whitelist(latin_fonts if latin_fonts is not None else (T["latin_fonts"] or []))
     size_ok = {float(s) for s in (sizes if sizes is not None else (T["sizes"] or []))} or None
     floor = float(min_size if min_size is not None else T["min_size"])
     hf_floor = float(T["hf_min_size"])
@@ -139,17 +178,27 @@ def check(path, tier="balanced", preset="A",
 
     prs = Presentation(path)
     n_slides = len(prs.slides)
+    page_h = prs.slide_height / EMU_IN
     deck_text = []
 
     for si, slide in enumerate(prs.slides, 1):
         steps = set()
         accent_shapes = 0
         page_colors = set()
+        fill_shapes = []      # (order, l, t, w, h, hex)：实底填充形状，供底色判定与色相统计
+        pic_rects = []        # (l, t, w, h)：图片矩形，盖住文字中心时底色不可判定
+        notes = ""
+        if slide.has_notes_slide:
+            notes = slide.notes_slide.notes_text_frame.text.strip()
+        note_exc = note_exception_rules(notes)
 
         def add(sev, rule, kind, detail, extra=""):
+            if rule in note_exc:      # 备注级例外：[例外:规则名] 降级为「例外」，保留可追溯
+                sev = "例外"
+                extra = (extra + "；" if extra else "") + "备注声明 [例外:" + rule + "]"
             findings.append(_finding(sev, si, rule, kind, detail, extra))
 
-        def walk_runs(runs, top_in=None, h_in=None, in_table=False):
+        def walk_runs(runs, top_in=None, h_in=None, in_table=False, bg="FFFFFF"):
             nonlocal accent_shapes
             for r in runs:
                 if not r.text.strip():
@@ -157,9 +206,12 @@ def check(path, tier="balanced", preset="A",
                 deck_text.append(r.text)
                 sz = r.font.size.pt if r.font.size else None
                 col = _run_color(r)
-                hf_ok = (col == P["hair"]) and is_hf_zone(top_in, h_in)
+                hf_ok = (col == P["hair"]) and is_hf_zone(top_in, h_in, page_h)
                 local_floor = hf_floor if hf_ok else floor
-                if sz is None or sz < local_floor:
+                if sz is None:
+                    add("WARNING", "TYP.INHERIT", "字号继承无法判定", r.text[:20],
+                        "run 未显式设字号；模板跟随可容忍，新稿应显式设字号")
+                elif sz < local_floor:
                     add(err, "TYP.MINSIZE", "字号过小", r.text[:20],
                         f"{sz}pt < {local_floor}pt" + ("（页眉页脚档）" if hf_ok else ""))
                 if sz is not None:
@@ -181,11 +233,11 @@ def check(path, tier="balanced", preset="A",
                         page_colors.add(col)
                     if col in accent_set:
                         pass  # 点缀按形状计数，不在此处计
-                    elif not hf_ok and col != P["white"]:
-                        ratio = contrast_ratio(col, "FFFFFF")
+                    elif not hf_ok and bg is not None:
+                        ratio = contrast_ratio(col, bg)
                         if ratio < 4.5:
                             add(err, "PAL.CONTRAST", "对比度不足", r.text[:16],
-                                f"{col} {ratio:.2f}:1 < 4.5:1")
+                                f"{col} 对实际底色 {bg} 仅 {ratio:.2f}:1 < 4.5:1")
                 lat, ea = slots(r)
                 if has_cjk(r.text):
                     if not ea:
@@ -201,18 +253,34 @@ def check(path, tier="balanced", preset="A",
                                 f"latin={lat}（英文将用中文字形渲染）")
                     elif lat_ok and lat not in lat_ok:
                         add(T["font_slot_severity"], "FONT.LATIN", "西文字体越界", r.text[:16], lat)
-                if ea == "黑体" and r.font.bold:
+                if r.font.bold and ea in HEI_FACES:
                     add(T["black_bold_severity"], "FONT.EA_BOLD", "黑体叠加粗体", r.text[:16], "合成粗会糊边；强调改换字体或点缀色")
                 if in_table and ea == "楷体":
                     add(err, "FONT.TABLE_KAI", "楷体入表格", r.text[:16], "表格只用宋体/黑体")
 
-        for shp in slide.shapes:
+        for order, shp in enumerate(slide.shapes):
             top_in = shp.top / EMU_IN if shp.top is not None else None
             h_in = shp.height / EMU_IN if shp.height is not None else None
+            fx = _solid_fill_hex(shp)
+            if fx:
+                if not is_neutral(fx):
+                    page_colors.add(fx)          # PAL.HUE：形状填充色也占色相额度
+                try:
+                    fill_shapes.append((order, shp.left / EMU_IN, shp.top / EMU_IN,
+                                        shp.width / EMU_IN, shp.height / EMU_IN, fx))
+                except Exception:
+                    pass
             if _shape_uses_accent(shp, accent_set):
                 accent_shapes += 1
+            if "PICTURE" in str(getattr(shp, "shape_type", "")):
+                try:
+                    pic_rects.append((shp.left / EMU_IN, shp.top / EMU_IN,
+                                      shp.width / EMU_IN, shp.height / EMU_IN))
+                except Exception:
+                    pass
             if getattr(shp, "has_text_frame", False):
-                walk_runs([r for p in shp.text_frame.paragraphs for r in p.runs], top_in, h_in)
+                bg = _effective_bg(shp, order, fill_shapes, pic_rects)
+                walk_runs([r for p in shp.text_frame.paragraphs for r in p.runs], top_in, h_in, bg=bg)
             if getattr(shp, "has_table", False):
                 for row in shp.table.rows:
                     for cell in row.cells:
@@ -221,6 +289,10 @@ def check(path, tier="balanced", preset="A",
             if getattr(shp, "has_chart", False):
                 try:
                     cs = shp.chart._chartSpace
+                    for sc in cs.iter(qn("a:srgbClr")):
+                        cv = normalize_hex(sc.get("val") or "")
+                        if cv and not is_neutral(cv):
+                            page_colors.add(cv)  # PAL.HUE：图表系列色占色相额度
                     for rPr in cs.iter(qn("a:defRPr")):
                         sz_raw = rPr.get("sz")
                         if sz_raw and int(sz_raw) < floor * 100:

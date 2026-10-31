@@ -31,6 +31,8 @@ metadata:
 每套预设是完整的 token 角色表（墨/次级灰/发丝线/图表灰/点缀/点缀深/序列色），不接受只换一个色值的"半套配色"；需要第二点缀色时从该预设的 series 里取，不自造。
 
 ## 硬性限制
+> 本节出现的具体色值均为**预设 A 的 token 举例**；换用其他预设（B/C/D）时同角色 token 整体替换——hair 发丝灰、muted 次级灰、accent 点缀、chart_neutral 图表灰的对应值见 `profiles.json`，规则不变。
+
 - 字体分两槽：**中文只用 宋体 / 楷体 / 黑体 / 微软雅黑**（写进 `a:ea`），**西文只用 Arial / Times New Roman**（写进 `a:latin`）。**默认配对：标题黑体 + 正文宋体**，宋体/楷体配 Times New Roman、黑体配 Arial；微软雅黑（现代无衬线）是可选项，整片统一换用时配 Arial。字号只走下面"字阶"的 7 档，**正文最小 16pt，页眉页脚档 14pt**。
 - 文字只用当前预设的 token 色（默认预设 A）：墨 `000000`（21:1）、次级灰 `6E6E6E`（5.1:1，图注/口径/落款/副标/导航未选中项）、页眉页脚极浅灰 `D9D9D9`（**仅限页眉章名、页脚标题与页码、封面顶部角标，且仅在页眉区 top+height≤0.7in 或页脚区 top≥7.0in 的位置**享受 14pt 下限与对比度豁免——机审按位置判定，染灰正文照查）、点缀蓝 `0072B2`（5.2:1，Okabe-Ito 色板）。**其余浅色只准做非文字**（线条、图形、图表柱），禁止作文字色；正文与图注不得使用 `D9D9D9`。需要第二点缀色时从预设 series 取，不自造。**不用色块、不用装饰图形**（圆/三角/竖条组/底纹一律不要）；页眉页脚必须 14pt 极浅灰退后，不抢正文。
 - **不做独立大数字 callout**：关键数字写在正文/表注句内，用**黑体墨色**强调；≥40pt 只允许封面主标题（机审强制）。
@@ -118,7 +120,7 @@ metadata:
 - **截断数值轴要诚实**：量纲相同、数值拥挤时允许截断窗口（如 `0.60–0.90、步长 0.05`、刻度格式 `0.00`），但**必须在图注写明"数值轴 X–Y，截断显示"**，结论句照常写"领先约 N 个千分点"这类真实量级——不许用截断制造断层假象，也不许假装没截断。
 - 类别多时（≥4 类）柱宽要留间隔，避免柱子挤成一条线；条形图同理。
 - 散点图把 `scatterStyle` 设为 `marker`，否则默认会带连线。
-- 图表配色：整根系列用中性灰 `BFBFBF`，只把最重要的一根柱（或表格里关键一行）设为点缀色 `0072B2`；数值标签墨色不加粗，轴线用发丝线。
+- 图表配色：整根系列用当前预设的图表灰（预设 A 为 `BFBFBF`），只把最重要的一根柱（或表格里关键一行）设为点缀色（预设 A 为 `0072B2`）；数值标签墨色不加粗，轴线用发丝线。
 - 对比类图表优先**横向条形图并按数值排序**，打开数值轴（0 到上限）与浅灰网格线让差距可读；零基线柱状图会压缩差异，"只点亮一根"必须建立在"差异可见"之上。
 - 同一页里所有形状的坐标以 **0.05in 为网格对齐**，视觉才成体系。
 
@@ -139,8 +141,8 @@ python scripts/preview_ppt.py 你的.pptx out.html --slide 0       # 预览（--
 ## 验收清单（交付前逐条过；机审项附规则 ID，由脚本按档位强制）
 | # | 验收项 | 规则 ID | 谁来查 |
 | --- | --- | --- | --- |
-| 1 | 字号只走 7 档；正文最小 16pt，14pt 仅限页眉页脚区的极浅灰档；非封面页 >36pt 即海报大字 | `TYP.MINSIZE` `TYP.LADDER` `TYP.POSTER` `TYP.STEPS` | 机审 `verify_ppt_style.py` |
-| 2 | 文字色 ∈ 当前预设 token 表且对白底 ≥4.5:1；发丝灰只在页眉/页脚区豁免 | `PAL.COLOR` `PAL.CONTRAST` `PAL.CHARTCOLOR` | 机审 `verify_ppt_style.py` |
+| 1 | 字号只走 7 档；正文最小 16pt，14pt 仅限页眉页脚区的极浅灰档；非封面页 >36pt 即海报大字；字号继承（未显式设）只警告 | `TYP.MINSIZE` `TYP.LADDER` `TYP.POSTER` `TYP.STEPS` `TYP.INHERIT` | 机审 `verify_ppt_style.py` |
+| 2 | 文字色 ∈ 当前预设 token 表且对**实际底色**（含淡卡片填充）≥4.5:1；发丝灰只在页眉/页脚区豁免 | `PAL.COLOR` `PAL.CONTRAST` `PAL.CHARTCOLOR` | 机审 `verify_ppt_style.py` |
 | 3 | 点缀色每页限额（strict ≤2 / balanced ≤3，按形状计）；图表点亮 ≤1 处 | `PAL.ACCENT_PAGE` `PAL.CHART_SERIES` | 机审 `verify_ppt_style.py` |
 | 4 | 结论/判断行与标题无"结论：/判断：/收束："前缀；"虚构/示例"各自 ≤4 次 | `TXT.PREFIX` `TXT.CAVEAT` | 机审 `verify_ppt_style.py` |
 | 5 | 双字体槽齐全：a:ea 中文白名单、a:latin 西文白名单；黑体不叠加粗体；楷体不入表格 | `FONT.EA` `FONT.LATIN` `FONT.LATIN_CJK` `FONT.EA_BOLD` `FONT.TABLE_KAI` | 机审（verify + audit） |
@@ -160,9 +162,9 @@ python scripts/preview_ppt.py 你的.pptx out.html --slide 0       # 预览（--
 | --- | --- | --- |
 | 档位 | `balanced`（学术/答辩场合用 `strict`） | 所有脚本 `--tier fast|balanced|strict`；check_ppt 旧参数 `--mode` 等价 |
 | 配色预设 | `A`（Okabe-Ito 学术蓝） | `--preset A|B|C|D`；临时换点缀色用 `--accent` |
-| 字体/字阶/字号下限/备注字数 | 取自当前档位 | `--fonts` `--latin-fonts` `--sizes` `--min-size` `--notes-min` |
+| 字体/字阶/字号下限/备注字数 | 取自当前档位 | `--fonts` `--latin-fonts`（四脚本通用，支持逗号串）`--sizes` `--min-size`（仅 verify/check）`--notes-min`（audit/check） |
 | 额外允许色 | 无 | `--allow-colors` 追加（模板跟随场景） |
-| 例外记录 | 无 | check_ppt `--exceptions exceptions.json`；页面级在备注写 `[例外:规则名]` + 理由 |
+| 例外记录 | 无 | check_ppt `--exceptions exceptions.json`；页面级在备注写 `[例外:规则名]` + 理由（页级规则生效；全片规则用 JSON） |
 
 ## 随附资源
 - `assets/example-slide.pptx`：六页完整示例（封面 / 章节页+导航 / 左文右图 / 三线表 / 卡片对比 / 收束页），虚构"歌声质量评估模型调研"主题，演示命题式标题、纯排版实证行、横向条形图、三线表与备注讲稿的成稿写法，全部为虚构占位数据；用 `scripts/build_example.py` 重新生成。
@@ -170,7 +172,7 @@ python scripts/preview_ppt.py 你的.pptx out.html --slide 0       # 预览（--
 - `scripts/audit_ppt.py`：越界、文本溢出、西文不可断行、表格单元格撑高、元素重叠、字体槽、字形缺失、备注缺失、阴影与特效（未显式关闭继承或带 outerShdw 等均判 FAIL）等结构性审查（交付前必跑）。
 - `scripts/preview_ppt.py`：pptx → HTML 预览（按 latin + ea 双槽拼字体栈，图表近似渲染）。
 - `references/workflow.md`：完整分阶段流程与返工触发条件。
-- `references/eval-queries.json`：30 条触发测试用例，用于改动 description 后回归触发率。
+- `references/eval-queries.json`：32 条触发测试用例，用于改动 description 后回归触发率。
 - `references/profiles.json`：三档 × 四配色预设的阈值唯一真相源；`scripts/profile_lib.py` 是加载器。
 - `references/palette-library.md`：外部色板库（7 组实算对比度），新预设与自定义序列色的选材来源。
 ## 交付与安全

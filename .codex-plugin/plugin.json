@@ -1,6 +1,6 @@
 {
   "name": "ppt-report-style",
-  "version": "0.4.1",
+  "version": "0.4.3",
   "description": "中文汇报 PPT 的排版规范与工作流：三档严格度（fast/balanced/strict）× 四套色盲安全配色预设（Okabe-Ito 等，附外部色板库）、双槽字体与七档字阶、关系模型与页面骨架、配图必要性分档、逐字稿与交付自检；统一检查入口按错误/警告/建议/例外分级，附回归测试。",
   "author": {
     "name": "xiongxq04",

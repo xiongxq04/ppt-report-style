@@ -112,6 +112,14 @@
     "should_trigger": true
   },
   {
+    "query": "配色换成青绿循环那套（深蓝锚点加暖色系列）",
+    "should_trigger": true
+  },
+  {
+    "query": "多系列图不够色，从色板库里挑三个能区分的",
+    "should_trigger": true
+  },
+  {
     "query": "帮我把这个 PPT 转成 PDF 发邮件",
     "should_trigger": false
   },

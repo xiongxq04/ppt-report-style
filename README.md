@@ -119,7 +119,7 @@ ppt-report-style/
     │   ├── style-rules.md         # 档位表与形状、结论条规则
     │   ├── template-editing.md    # 模板跟随改版四步
     │   ├── checking.md            # 规则 ID、检查分级、例外协议与交付
-    │   └── eval-queries.json      # 30 条触发测试用例
+    │   └── eval-queries.json      # 32 条触发测试用例
     └── scripts/                   # 检查 / 预览 / 示例生成 / 回归
 ```
 

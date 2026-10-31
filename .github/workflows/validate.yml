@@ -28,11 +28,19 @@ jobs:
           assert 20 <= len(desc) <= 1024, len(desc)
           print("frontmatter OK:", name, "| description", len(desc), "字符")
           PY
-      - name: Profiles & palette self-check
+      - name: Profiles & palette self-check (all presets, dynamic)
         run: |
-          python skills/ppt-report-style/scripts/palette_utils.py --check
-          python skills/ppt-report-style/scripts/palette_utils.py --check --preset B
-          python skills/ppt-report-style/scripts/palette_utils.py --check --preset C
+          python - <<'PY'
+          import os, subprocess, sys
+          here = "skills/ppt-report-style/scripts"
+          sys.path.insert(0, here)
+          from profile_lib import preset_names
+          for name in preset_names():
+              r = subprocess.run([sys.executable, os.path.join(here, "palette_utils.py"),
+                                  "--check", "--preset", name])
+              assert r.returncode == 0, f"预设 {name} 自检失败"
+          print("全部预设自检 OK:", ", ".join(preset_names()))
+          PY
       - name: Style check on example deck (tier × preset matrix)
         run: |
           python skills/ppt-report-style/scripts/verify_ppt_style.py skills/ppt-report-style/assets/example-slide.pptx --tier balanced --preset A
@@ -55,6 +63,11 @@ jobs:
           # 幻灯片数、每页全部文本、图表分类与数值、点缀色使用形状数逐一相等。
           from pptx import Presentation
           from pptx.oxml.ns import qn
+          import json
+
+          # 点缀色从真相源读取，不硬编码——换默认预设时本步骤自动跟随
+          with open("skills/ppt-report-style/references/profiles.json", encoding="utf-8") as fh:
+              accent = json.load(fh)["presets"]["A"]["accent"]
 
           def digest(path):
               prs = Presentation(path)
@@ -79,7 +92,7 @@ jobs:
                           xml = shp.chart._chartSpace.xml if getattr(shp, "has_chart", False) else (shp.text_frame.text if getattr(shp, "has_text_frame", False) else "")
                       except Exception:
                           xml = ""
-                      if "0072B2" in xml.upper():
+                      if accent in xml.upper():
                           accent_shapes += 1
                   out.append((tuple(texts), tuple(charts), accent_shapes))
               return out

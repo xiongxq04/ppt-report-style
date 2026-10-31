@@ -47,13 +47,13 @@
 
 | 前缀 | 覆盖范围 | 示例 |
 | --- | --- | --- |
-| `GEO.` | 几何与容器 | `GEO.OUTSIDE` 越界、`GEO.TABLE_WIDTH` 列宽不一致 |
+| `GEO.` | 几何与容器 | `GEO.OUTSIDE` 越界、`GEO.TABLE_WIDTH` 列宽不一致、`GEO.OVERLAP_VISUAL` 图片压文字（>18% 提醒） |
 | `TXT.` | 文字 | `TXT.OVERFLOW` 溢出、`TXT.OVERLAP` 重叠、`TXT.GLYPH` 字形缺失、`TXT.NOBREAK` 西文不可断行、`TXT.FULLWIDTH` 全角西文、`TXT.TABLE_OVERFLOW` 单元格撑高、`TXT.PREFIX` 结论行前缀、`TXT.CAVEAT` 口径声明超量 |
-| `TYP.` | 字号 | `TYP.MINSIZE` 字号过小、`TYP.LADDER` 不在字阶内、`TYP.STEPS` 一页档数过多、`TYP.POSTER` 非封面海报大字、`TYP.CHARTSIZE` 图表字号过小 |
+| `TYP.` | 字号 | `TYP.MINSIZE` 字号过小、`TYP.INHERIT` 字号继承无法判定（WARNING）、`TYP.LADDER` 不在字阶内、`TYP.STEPS` 一页档数过多、`TYP.POSTER` 非封面海报大字、`TYP.CHARTSIZE` 图表字号过小 |
 | `PAL.` | 配色 | `PAL.CONTRAST` 对比度、`PAL.COLOR` 方案外颜色、`PAL.CHARTCOLOR` 图表颜色、`PAL.ACCENT_PAGE` 点缀每页超额、`PAL.CHART_SERIES` 图表点亮超额、`PAL.HUE` 色相组数、`PAL.INHERIT` 继承色无法判定 |
 | `FONT.` | 字体槽 | `FONT.EA` 中文字槽越界/缺失、`FONT.LATIN` 西文槽越界/缺失、`FONT.LATIN_CJK` 西文槽填了中文字体、`FONT.EA_BOLD` 黑体叠加粗体、`FONT.TABLE_KAI` 楷体入表格 |
-| `LAY.` | 布局 | `LAY.REPEAT` 骨架重复（档位分治）、`LAY.PURETEXT` 纯文字页比例（档位分治） |
-| `IMG.` | 配图 | `IMG.RES` 按放置尺寸分辨率不足（<96dpi ERROR，<150dpi WARNING） |
+| `LAY.` | 布局 | `LAY.REPEAT` 骨架重复（档位分治）、`LAY.PURETEXT` 纯文字页比例（档位分治）、`LAY.MEANS` 纯文字页无字号层级（SUGGESTION） |
+| `IMG.` | 配图 | `IMG.RES` 按放置尺寸分辨率不足（<96dpi ERROR，<150dpi WARNING）、`IMG.MISSING` 图片数据无法读取（WARNING）、`IMG.QUALITY` 长边像素过低（WARNING） |
 | `EFF.` | 效果 | `EFF.SHADOW` 阴影/特效、`EFF.STYLE_REF` 主题特效引用（effectRef） |
 | `MED.` | 媒体与对象 | `MED.SMARTART` 禁用对象 |
 | `NOTE.` | 备注 | `NOTE.SHORT` 逐字稿过短（档位分治） |
@@ -64,9 +64,10 @@
 
 ## 例外机制
 
+- **页面级例外**在该页备注写 `[例外:规则名]` + 一句理由（如 `[例外:LAY.REPEAT] 同一图表分三页展开`）——命中规则的发现降级为「例外」并保留在报告中，可追溯。适用于页级规则；全片级规则（`TXT.PREFIX`、`TXT.CAVEAT`、`LAY.PURETEXT`）请用 JSON 例外。
 - 结构性例外用参数声明：沿用原模板保留 SmartArt 用 `--allow-smartart`。
-- 页面级例外在备注写 `[例外:骨架重复]` 等标记并说明理由。
 - 长期例外写进 `exceptions.json`，用 `--exceptions` 传入；命中例外的条目降级为"例外"并在报告中保留，不直接丢弃。
+- 同页同规则的重复发现最多报 3 条（`--max-per-rule` 可调），超出部分静默截断——修掉已报的通常会让其余同因问题消失。
 - 例外不会降级安全、版权与可读性规则：对比度、字号、缺失图片和禁用对象仍然报错。
 
 ## 检查顺序
@@ -96,5 +97,5 @@ python run_regression.py          # 回归：正例零错误零警告；反例�
 
 - 修改已有 PPT 时输出新文件，不覆盖源文件。
 - 先给预览或修改摘要，再交付文件。
-- 不自动执行 Git add、commit、push 或分支切换。
+- Git 操作不静默执行：纳入版本管理按 `workflow.md` 阶段 6 执行——提交前说明改了什么，push 需用户明确要求；只提交本次交付文件。
 - 交付说明列绝对路径、主要变化、验证结果、例外理由和仍需人工确认的风险。

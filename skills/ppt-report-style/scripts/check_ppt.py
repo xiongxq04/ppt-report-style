@@ -99,11 +99,10 @@ def main():
     allow_colors = [item.strip() for item in args.allow_colors.split(",") if item.strip()]
     sizes = [float(s) for s in args.sizes.split(",")] if args.sizes else None
 
-    findings, layout_rows = audit(args.file, tier=tier, preset=args.preset,
-                                  fonts=args.fonts, latin_fonts=args.latin_fonts,
-                                  notes_min=notes_min, allow_smartart=args.allow_smartart)
-    findings = set(findings)
-    findings.update(style_check(
+    audit_findings, layout_rows = audit(args.file, tier=tier, preset=args.preset,
+                                        fonts=args.fonts, latin_fonts=args.latin_fonts,
+                                        notes_min=notes_min, allow_smartart=args.allow_smartart)
+    style_findings = style_check(
         args.file,
         tier=tier,
         preset=args.preset,
@@ -116,8 +115,16 @@ def main():
         max_steps=args.max_steps,
         allow_cjk_latin=args.allow_cjk_latin,
         max_per_rule=args.max_per_rule,
-    ))
-    ordered = sorted(findings, key=lambda item: (item[1], SEVERITY_ORDER.get(item[0], 9), item[2]))
+    )
+    # 确定性合并：audit 与 verify 对同一发现各报一次（如 FONT.EA 的两种措辞）时按
+    # (页码, 规则, 对象) 去重，保留结构侧；再按 (页码, 严重度, 规则) 稳定排序。
+    merged, seen = [], set()
+    for item in audit_findings + style_findings:
+        key = (item[1], item[2], item[4])
+        if key not in seen:
+            seen.add(key)
+            merged.append(item)
+    ordered = sorted(merged, key=lambda item: (item[1], SEVERITY_ORDER.get(item[0], 9), item[2]))
 
     excepted = []
     if args.exceptions:

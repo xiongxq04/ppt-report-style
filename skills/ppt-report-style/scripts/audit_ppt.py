@@ -32,11 +32,11 @@ try:
 except ImportError:
     print("需要 python-pptx：pip install python-pptx"); sys.exit(2)
 
-from profile_lib import get_tier, get_preset
+from profile_lib import get_tier, get_preset, expand_font_whitelist, note_exception_rules
 
 EMU_IN = 914400.0
 EMU_PT = 12700.0
-CJK_FACES = {"宋体", "楷体", "黑体", "SimSun", "KaiTi", "SimHei", "Microsoft YaHei"}
+CJK_FACES = {"宋体", "楷体", "黑体", "微软雅黑", "SimSun", "KaiTi", "SimHei", "Microsoft YaHei"}
 NARROW_LATIN = set("ijlrtf|.,:;'\"()[]{}/!-\\` ")
 WIDE_LATIN = set("mwMW@%&")
 
@@ -156,10 +156,11 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
     P = get_preset(preset)
     issues = []
     layout_rows = []
+    note_exc_by_slide = {}
     prs = Presentation(path)
     sw, sh_ = prs.slide_width / EMU_IN, prs.slide_height / EMU_IN
-    ea_ok = {f for f in (fonts if fonts is not None else (T["fonts"] or [])) if f}
-    lat_ok = {f for f in (latin_fonts if latin_fonts is not None else (T["latin_fonts"] or [])) if f}
+    ea_ok = expand_font_whitelist(fonts if fonts is not None else (T["fonts"] or []))
+    lat_ok = expand_font_whitelist(latin_fonts if latin_fonts is not None else (T["latin_fonts"] or []))
     n_min = int(notes_min if notes_min is not None else T["notes_min"])
     note_sev = "ERROR" if tier == "strict" else ("WARNING" if tier == "balanced" else None)
 
@@ -169,8 +170,17 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
         graphic_shapes = 0
         smartart = 0
         max_size = 0.0
+        page_sizes = set()
+        notes = ""
+        if slide.has_notes_slide:
+            notes = slide.notes_slide.notes_text_frame.text.strip()
+        note_exc = note_exception_rules(notes)
+        note_exc_by_slide[si] = note_exc
 
         def add(sev, rule, kind, detail, extra=""):
+            if rule in note_exc:      # 备注级例外：[例外:规则名] 降级为「例外」，保留可追溯
+                sev = "例外"
+                extra = (extra + "；" if extra else "") + "备注声明 [例外:" + rule + "]"
             issues.append((sev, si, rule, kind, detail, extra))
 
         def check_runs(runs, where=""):
@@ -180,6 +190,7 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
                     continue
                 if r.font.size:
                     max_size = max(max_size, r.font.size.pt)
+                    page_sizes.add(r.font.size.pt)
                 lat, ea = slots(r)
                 if any(is_cjk(c) for c in r.text):
                     if not ea or (ea_ok and ea not in ea_ok):
@@ -256,7 +267,12 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
                 pic_boxes.append((l or 0, t or 0, w or 0, h or 0))
                 graphic_shapes += 1
                 try:
-                    px_w = shp.image.size[0]
+                    px_w, px_h = shp.image.size
+                except Exception:
+                    add("WARNING", "IMG.MISSING", "图片数据无法读取",
+                        f"{w:.2f}x{h:.2f}in" if w else str(shp.shape_type),
+                        "链接图或文件损坏，分辨率不可判定；换内嵌图")
+                else:
                     if w:
                         dpi = px_w / w
                         if dpi < 96:
@@ -265,8 +281,10 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
                         elif dpi < 150:
                             add("WARNING", "IMG.RES", "配图分辨率偏低", f"{px_w}px / {w:.2f}in",
                                 f"有效约 {dpi:.0f} dpi < 150")
-                except Exception:
-                    pass
+                    long_edge = max(px_w, px_h)
+                    if long_edge < 800:
+                        add("WARNING", "IMG.QUALITY", "图片长边像素过低", f"{long_edge}px",
+                            "放大后可能糊边；按放置尺寸换高清图")
             if "AUTO_SHAPE" in _st and getattr(shp, "fill", None) is not None:
                 # 只有"有体量"的形状才算版面结构：面积 >0.3 in²，或填充/描边不是发丝灰。
                 # 发丝线、页眉页脚横线太细，不构成视觉手段，否则纯文字页判定全部失效。
@@ -348,13 +366,22 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
                         add("ERROR", "TXT.OVERLAP", "文本重叠", f"[{a[0]}] x [{b[0]}]",
                             f"覆盖 {area/small*100:.0f}%")
 
+        for pic in pic_boxes:      # 图片与文字重叠：占了小块面积 18% 以上提醒人工复核
+            for b in tb_boxes:
+                ox = min(pic[0] + pic[2], b[0] + b[2]) - max(pic[0], b[0])
+                oy = min(pic[1] + pic[3], b[1] + b[3]) - max(pic[1], b[1])
+                if ox > 0.02 and oy > 0.02:
+                    area = ox * oy
+                    small = min(pic[2] * pic[3], b[2] * b[3])
+                    if small > 0 and area / small > 0.18:
+                        add("WARNING", "GEO.OVERLAP_VISUAL", "图片与文字重叠",
+                            f"@({pic[0]:.2f},{pic[1]:.2f}) {pic[2]:.2f}x{pic[3]:.2f}",
+                            f"覆盖 {area / small * 100:.0f}%，人工复核")
+
         if smartart and not allow_smartart:
             add("ERROR", "MED.SMARTART", "禁用对象", f"{smartart} 个 SmartArt",
                 "用普通形状/表格/图表表达；模板沿用需 --allow-smartart")
 
-        notes = ""
-        if slide.has_notes_slide:
-            notes = slide.notes_slide.notes_text_frame.text.strip()
         if note_sev and len(notes) < n_min:
             add(note_sev, "NOTE.SHORT", "逐字稿过短", f"{len(notes)} 字 < {n_min}",
                 "备注写约 1 分钟逐字稿 + 口径备答")
@@ -363,6 +390,9 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
         pure_text = not (chart_boxes or table_boxes or pic_boxes) and graphic_shapes == 0
         means = ("图表" if chart_boxes else "表格" if table_boxes else "图片" if pic_boxes
                  else "图形结构" if graphic_shapes else "纯排版")
+        if pure_text and max_size < 36 and len(page_sizes) < 2:
+            add("SUGGESTION", "LAY.MEANS", "纯文字页无字号层级", f"仅 {len(page_sizes)} 档字号",
+                "纯文字页至少两级字号拉开主次（visual-means.md）；封面/章节页豁免")
         relation = _relation(table_boxes, chart_boxes, len(tb_boxes))
         # 封面/章节页（存在 ≥36pt 标题）允许纯排版，不计入纯文字页比例
         layout_rows.append((si, relation, skeleton, means, pure_text, max_size >= 36))
@@ -375,9 +405,14 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
                 run += 1
             else:
                 if run >= 3:
-                    issues.append((T["skeleton_repeat_severity"], i, "LAY.REPEAT", "骨架重复",
-                                   f"连续 {run} 页「{layout_rows[i-1][2]}」",
-                                   "例外：逐步揭示同一图可写 [例外:骨架重复]"))
+                    if "LAY.REPEAT" in note_exc_by_slide.get(i, set()):
+                        issues.append(("例外", i, "LAY.REPEAT", "骨架重复",
+                                       f"连续 {run} 页「{layout_rows[i-1][2]}」",
+                                       "备注声明 [例外:LAY.REPEAT]"))
+                    else:
+                        issues.append((T["skeleton_repeat_severity"], i, "LAY.REPEAT", "骨架重复",
+                                       f"连续 {run} 页「{layout_rows[i-1][2]}」",
+                                       "例外：逐步揭示同一图可写 [例外:骨架重复]"))
                 run = 1
     ratio_cap = T["pure_text_ratio"]
     if ratio_cap is not None:

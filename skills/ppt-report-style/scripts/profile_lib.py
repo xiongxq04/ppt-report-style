@@ -5,6 +5,7 @@
 """
 import json
 import os
+import re
 import sys
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -14,9 +15,16 @@ _PROFILES_PATH = os.path.join(_HERE, "..", "references", "profiles.json")
 
 _CACHE = None
 
-# 页眉页脚极浅灰档的几何判定区（单位 in，13.33x7.5 画布）
+# 页眉页脚极浅灰档的几何判定区（基准画布 13.33x7.5 in，非标画布按页高等比缩放）
 HF_ZONE_TOP_MAX = 0.70     # top + height ≤ 0.70 视为页眉区
 HF_ZONE_TOP_MIN = 7.00     # top ≥ 7.00 视为页脚区
+
+# 中文常用字体的中英文名等价对：PPT 文件里两者都可能出现，白名单必须同时放行
+FONT_ALIASES = {"宋体": "SimSun", "黑体": "SimHei", "楷体": "KaiTi",
+                "微软雅黑": "Microsoft YaHei", "仿宋": "FangSong"}
+
+# 备注级例外标记：[例外:规则名]（checking.md 例外机制）
+NOTE_EXCEPTION_RE = re.compile(r"\[例外[:：]\s*([A-Z]{2,8}\.[A-Z_]{2,})\s*\]")
 
 
 def load_profiles():
@@ -59,10 +67,38 @@ def accent_family(preset):
     return {preset["accent"].upper(), preset["accent_deep"].upper()}
 
 
-def is_hf_zone(top_in, height_in):
+def is_hf_zone(top_in, height_in, page_h_in=7.5):
+    scale = (page_h_in or 7.5) / 7.5
     if top_in is None:
         return False
-    return (top_in + (height_in or 0)) <= HF_ZONE_TOP_MAX or top_in >= HF_ZONE_TOP_MIN
+    return ((top_in + (height_in or 0)) <= HF_ZONE_TOP_MAX * scale
+            or top_in >= HF_ZONE_TOP_MIN * scale)
+
+
+def expand_font_whitelist(names):
+    """把字体白名单按中英文别名展开：写 '宋体' 也放行 'SimSun'，反之亦然。
+    同时接受逗号分隔字符串（CLI 传参场景）或可迭代对象。"""
+    if names is None:
+        return None
+    if isinstance(names, str):
+        names = names.split(",")
+    out = set()
+    for name in names:
+        name = str(name).strip()
+        if not name:
+            continue
+        out.add(name)
+        for zh, en in FONT_ALIASES.items():
+            if name == zh:
+                out.add(en)
+            elif name == en:
+                out.add(zh)
+    return out
+
+
+def note_exception_rules(notes_text):
+    """解析备注里的 [例外:规则名] 标记，返回规则 ID 集合。"""
+    return set(NOTE_EXCEPTION_RE.findall(notes_text or ""))
 
 
 def tier_names():
