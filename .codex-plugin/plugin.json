@@ -1,0 +1,39 @@
+{
+  "name": "ppt-report-style",
+  "version": "0.4.0",
+  "description": "中文汇报 PPT 的排版规范与工作流：三档严格度（fast/balanced/strict）× 三套色盲安全配色预设（Okabe-Ito 等）、双槽字体与七档字阶、关系模型与页面骨架、配图必要性分档、逐字稿与交付自检；统一检查入口按错误/警告/建议/例外分级，附回归测试。",
+  "author": {
+    "name": "xiongxq04",
+    "url": "https://github.com/xiongxq04"
+  },
+  "homepage": "https://github.com/xiongxq04/ppt-report-style",
+  "repository": "https://github.com/xiongxq04/ppt-report-style",
+  "license": "MIT",
+  "keywords": [
+    "ppt",
+    "pptx",
+    "presentation",
+    "chinese",
+    "design",
+    "reporting",
+    "layout",
+    "color-palette"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "汇报 PPT 规范",
+    "shortDescription": "中文汇报 PPT 的排版规范、配色体系与交付自检",
+    "longDescription": "按一套可执行的中文汇报规范生成或改版 PPT：档位化严格度（草稿/组会/答辩三档）与成套配色预设（A 学术蓝 / B 深青蓝 / C 砖红，全部通过 WCAG 对比度门槛）、中文/西文双槽字体与七档字阶、按内容关系选骨架、每页至少一种视觉手段、配图必要性分档与素材来源管理、逐字稿写入备注；交付前用统一检查入口（check_ppt.py）按错误/警告/建议/例外汇总，并附色阶与对比度工具、HTML 预览、6 页示例与含正反例的回归测试。",
+    "developerName": "xiongxq04",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "按这套规范帮我做一份汇报 PPT",
+      "把这个 PPT 按规范重新排版并出预览图",
+      "检查这个 pptx 的配色、字号和版式是否达标"
+    ]
+  }
+}

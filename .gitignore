@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.html
+~$*
+.DS_Store
+example-negative.pptx
+placeholder-small.png

@@ -1,0 +1,93 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip python-pptx
+      - name: Skill frontmatter check
+        run: |
+          python - <<'PY'
+          import re, pathlib
+          t = pathlib.Path("skills/ppt-report-style/SKILL.md").read_text(encoding="utf-8")
+          m = re.match(r"---\n(.*?)\n---\n", t, re.S)
+          assert m, "缺少 frontmatter"
+          fm = m.group(1)
+          name = re.search(r"^name:\s*(.+)$", fm, re.M).group(1).strip().strip('"\'')
+          desc = re.search(r"^description:\s*(.+)$", fm, re.M).group(1).strip()
+          assert name == "ppt-report-style", name
+          assert 20 <= len(desc) <= 1024, len(desc)
+          print("frontmatter OK:", name, "| description", len(desc), "字符")
+          PY
+      - name: Profiles & palette self-check
+        run: |
+          python skills/ppt-report-style/scripts/palette_utils.py --check
+          python skills/ppt-report-style/scripts/palette_utils.py --check --preset B
+          python skills/ppt-report-style/scripts/palette_utils.py --check --preset C
+      - name: Style check on example deck (tier × preset matrix)
+        run: |
+          python skills/ppt-report-style/scripts/verify_ppt_style.py skills/ppt-report-style/assets/example-slide.pptx --tier balanced --preset A
+          python skills/ppt-report-style/scripts/verify_ppt_style.py skills/ppt-report-style/assets/example-slide.pptx --tier strict --preset A
+          python skills/ppt-report-style/scripts/verify_ppt_style.py skills/ppt-report-style/assets/example-slide.pptx --tier fast --preset A
+      - name: Structural audit on example deck
+        run: |
+          python skills/ppt-report-style/scripts/audit_ppt.py skills/ppt-report-style/assets/example-slide.pptx --tier balanced
+          python skills/ppt-report-style/scripts/audit_ppt.py skills/ppt-report-style/assets/example-slide.pptx --tier strict
+      - name: Unified check (balanced + strict)
+        run: |
+          python skills/ppt-report-style/scripts/check_ppt.py skills/ppt-report-style/assets/example-slide.pptx --tier balanced
+          python skills/ppt-report-style/scripts/check_ppt.py skills/ppt-report-style/assets/example-slide.pptx --tier strict --layout-report
+      - name: Example deck regenerates with identical content (semantic)
+        run: |
+          git show HEAD:skills/ppt-report-style/assets/example-slide.pptx > /tmp/before.pptx
+          python skills/ppt-report-style/scripts/build_example.py /tmp/after.pptx
+          python - <<'PY'
+          # 语义比对（不比 zip/XML 字节，避免 python-pptx 版本差异造成假阴性）：
+          # 幻灯片数、每页全部文本、图表分类与数值、点缀色使用形状数逐一相等。
+          from pptx import Presentation
+          from pptx.oxml.ns import qn
+
+          def digest(path):
+              prs = Presentation(path)
+              out = []
+              for slide in prs.slides:
+                  texts, charts = [], []
+                  accent_shapes = 0
+                  for shp in slide.shapes:
+                      if getattr(shp, "has_text_frame", False):
+                          texts.append(shp.text_frame.text)
+                      if getattr(shp, "has_table", False):
+                          for row in shp.table.rows:
+                              for cell in row.cells:
+                                  texts.append(cell.text)
+                      if getattr(shp, "has_chart", False):
+                          ch = shp.chart
+                          plots = ch.plots[0]
+                          charts.append((list(plots.categories),
+                                         [(s.name, list(s.values)) for s in plots.series]))
+                      xml = ""
+                      try:
+                          xml = shp.chart._chartSpace.xml if getattr(shp, "has_chart", False) else (shp.text_frame.text if getattr(shp, "has_text_frame", False) else "")
+                      except Exception:
+                          xml = ""
+                      if "0072B2" in xml.upper():
+                          accent_shapes += 1
+                  out.append((tuple(texts), tuple(charts), accent_shapes))
+              return out
+
+          a, b = digest("/tmp/before.pptx"), digest("/tmp/after.pptx")
+          assert len(a) == len(b) == 6, (len(a), len(b))
+          assert a == b, "示例页语义不一致（文本/图表/点缀计数有差异）"
+          print("示例页语义一致 ✓")
+          PY
+      - name: Regression (positive clean on all tiers & presets, negative hits expected rules)
+        run: python skills/ppt-report-style/scripts/run_regression.py
