@@ -6,7 +6,7 @@ verify_ppt_style.py 管字阶、配色与对比度、点缀限额、图表配色
 本脚本只做调度、去重、例外过滤和汇总。阈值唯一来源：references/profiles.json。
 
 用法:
-  python check_ppt.py <file.pptx> [--tier fast|balanced|strict] [--preset A|B|C]
+  python check_ppt.py <file.pptx> [--tier fast|balanced|strict] [--preset A|B|C|D]
                       [--exceptions exceptions.json] [--preview-out preview.html]
                       [--json report.json] [--layout-report]
   --mode balanced|strict  兼容旧参数，等价于 --tier（与 --tier 同时给时 --tier 优先）
@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.stdout.reconfigure(encoding="utf-8")
 
 from audit_ppt import audit, format_findings, format_layout
-from profile_lib import get_tier, get_preset, preset_colors
+from profile_lib import get_tier, get_preset, preset_colors, preset_names
 from verify_ppt_style import check as style_check
 
 SEVERITY_ORDER = {"ERROR": 0, "WARNING": 1, "SUGGESTION": 2, "例外": 3}
@@ -68,7 +68,7 @@ def main():
     parser.add_argument("--mode", choices=("balanced", "strict"), default=None,
                         help="兼容旧参数；等价于 --tier")
     parser.add_argument("--tier", choices=("fast", "balanced", "strict"), default=None)
-    parser.add_argument("--preset", default="A", choices=("A", "B", "C"))
+    parser.add_argument("--preset", default="A", choices=tuple(preset_names()))
     parser.add_argument("--min-size", type=float, default=None)
     parser.add_argument("--accent", default=None, help="临时覆盖预设点缀色")
     parser.add_argument("--contrast-color", default=None, help="兼容旧参数（已并入预设，忽略）")

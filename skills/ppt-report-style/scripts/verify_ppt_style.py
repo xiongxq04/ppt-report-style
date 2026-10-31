@@ -5,7 +5,7 @@
 规则 ID 见 references/checking.md；本脚本负责 TYP.* / PAL.* / FONT.* 三组。
 
 用法:
-  python verify_ppt_style.py <file.pptx> [more.pptx ...] --tier balanced|strict|fast --preset A|B|C
+  python verify_ppt_style.py <file.pptx> [more.pptx ...] --tier balanced|strict|fast --preset A|B|C|D
   python verify_ppt_style.py deck.pptx --tier strict --preset A
 选项（全部可选，缺省取档位/预设值）:
   --min-size / --sizes / --max-steps / --fonts / --latin-fonts / --allow-colors / --accent

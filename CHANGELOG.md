@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.4.1（2026-10-31）—— 新增配色预设 D + 外部色板库；修复冲突标记入库
+
+### 修复
+- **合并冲突标记被原样提交**：e57063a（merge 45a4df3 × 5fc39cf）把 `<<<<<<<` 冲突现场提交进 20 个文档与脚本，导致文档不可读、脚本不可运行。统一保留 v0.4.0（HEAD）侧——profiles.json 真相源即 v0.4.0 架构，v0.3.0 旧文档与其矛盾；全部文件自 45a4df3 恢复。
+- 补删 `_commit_msg.txt` 草稿（v0.4.0 声称已删但仍入库）。
+
+### 新增
+- **配色预设 D「青绿循环」**（`--preset D`）：深蓝锚点 `26465E`（9.9:1）+ 青绿/暖黄/橙/砖红四档暖色系列（`2A9D8F / E9C46A / F4A261 / E76F51`），来自科研五色循环色板；hair/chart_neutral/accent_deep 由 `generate_scale` 从锚点派生并逐档核对。`profiles.json` 升至 0.4.1。
+- **外部色板库 `references/palette-library.md`**：收录 7 组外部配色 + 十四宫格的逐色实算数据（HSL 结构、对白底 WCAG 对比度、文字/图形/填充判定、每组最佳用途），全部数值与 `palette_utils.py` 同源；含"近亲警告"（26465E/26445E/283E4E 视为同一深蓝墨）与四步"晋升规则"（选锚点→派生脚手架→选序列色→入册回归）。
+- **预设名单全链路动态化**：`check_ppt.py` / `build_example.py` 的 `--preset` choices、`run_regression.py` 的预设冒烟循环改为从 `profile_lib.preset_names()` 读取——今后新增预设只改 profiles.json 一个文件。
+- SKILL.md / palette-system.md / README / checking.md / plugin.json 同步为四套预设表述。
+
 ## v0.4.0（2026-10-31）—— 档位 × 预设架构 + 一致性大修
 
 ### 新增

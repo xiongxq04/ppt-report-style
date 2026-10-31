@@ -15,18 +15,19 @@ from pptx.oxml.ns import qn, nsdecls
 from pptx.oxml import parse_xml
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+from profile_lib import get_preset as _get_preset, preset_names as _preset_names
 _ap = argparse.ArgumentParser()
 _ap.add_argument("out", nargs="?", default=os.path.join(HERE, "..", "assets", "example-slide.pptx"),
                  help="输出路径（兼容旧用法：位置参数）")
 _ap.add_argument("--variant", choices=("academic", "negative"), default="academic",
                  help="academic=6 页正例；negative=回归反例（故意违规）")
 _ap.add_argument("--out", dest="out_opt", default=None, help="输出路径（与位置参数二选一）")
-_ap.add_argument("--preset", default="A", choices=("A", "B", "C"), help="配色预设（见 references/profiles.json）")
+_ap.add_argument("--preset", default="A", choices=tuple(_preset_names()),
+                 help="配色预设（见 references/profiles.json）")
 _a = _ap.parse_args()
 OUT = _a.out_opt or _a.out
 VARIANT = _a.variant
-sys.path.insert(0, HERE)
-from profile_lib import get_preset as _get_preset
 _PRESET = _get_preset(_a.preset)
 # 配色：取自 references/profiles.json 的成套预设（默认 A = Okabe-Ito 学术蓝）
 # 文字对比度全部 ≥4.5:1：墨 21:1 / 次级灰 6E6E6E 5.1:1 / 点缀蓝 0072B2 5.2:1

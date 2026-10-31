@@ -88,7 +88,7 @@ python run_regression.py          # 回归：正例零错误零警告；反例�
 
 - `check_ppt.py` 是统一入口：调度 `audit_ppt.py`（几何、布局、配图、备注）与 `verify_ppt_style.py`（配色、对比度、字号、字体），去重后按错误、警告、建议和例外汇总；档位经 `--tier`（旧参数 `--mode` 等价）传给两个子脚本。
 - `palette_utils.py --check` 做预设对比度自检；`preview_ppt.py` 只负责渲染预览，不做风格判定。
-- `run_regression.py` 是回归基线：正例（6 页学术示例）在 balanced 与 strict 下必须零错误零警告，三套配色预设各做一次端到端冒烟，反例必须命中全部预期规则（见脚本内 `EXPECTED_NEGATIVE_RULES`）。
+- `run_regression.py` 是回归基线：正例（6 页学术示例）在 balanced 与 strict 下必须零错误零警告，全部配色预设各做一次端到端冒烟（新增预设自动纳入），反例必须命中全部预期规则（见脚本内 `EXPECTED_NEGATIVE_RULES`）。
 - 自动检查不能代替打开 PPT 后的视觉复核；布局分类是保守估算，最终以人工审阅为准。
 - 用户反馈修改后，必须重新生成并重跑检查，而不是只重跑生成。
 

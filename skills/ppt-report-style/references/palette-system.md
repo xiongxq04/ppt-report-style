@@ -1,9 +1,9 @@
-# 配色系统（预设 A/B/C）
+# 配色系统（预设 A/B/C/D）
 
 > 阈值唯一权威是 `references/profiles.json` 与 SKILL.md；本文件只做展开说明，不重定义任何色值与限额。
 > 可执行实现：`scripts/palette_utils.py`（对比度/色相/派生）与 `scripts/verify_ppt_style.py`（PAL.* 规则）。
 
-## 三套预设，每套是完整的 token 角色表
+## 四套预设，每套是完整的 token 角色表
 
 | Token | 作用 | 文字可用？ |
 | --- | --- | --- |
@@ -20,6 +20,7 @@
 | `A`（默认） | 学术蓝 | `0072B2` | Okabe & Ito Color Universal Design；Wong, Nature Methods 2011 |
 | `B` | 深青蓝 | `283E4E` | v0.3 主题色系保留（深档） |
 | `C` | 砖红 | `A63603` | ColorBrewer 暖调（红紫/橄榄组合） |
+| `D` | 青绿循环（深蓝锚点·暖色系列） | `26465E` | 科研五色循环色板（见 palette-library.md 组6）；脚手架档由 `--scale` 从 accent 派生 |
 
 **换预设 = 整套换**：`--preset B` 一次替换全部 token，不接受只换点缀色的"半套配色"。
 需要自定义品牌色时（模板跟随场景），用 `palette_utils.py --scale <基色>` 派生同色相色阶，

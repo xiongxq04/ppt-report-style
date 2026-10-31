@@ -19,13 +19,14 @@ metadata:
 
 用户说"严格按我的规范 / 学术模式 / 答辩"时用 `strict`；未指明用 `balanced`。下文"硬性限制"各条默认按 strict（= 个人学术规范原文），凡与档位表冲突处，以档位表为准。
 
-**三套配色预设**（脚本 `--preset A|B|C`；完整 token 表见 profiles.json）：
+**四套配色预设**（脚本 `--preset A|B|C|D`；完整 token 表见 profiles.json，来源色板库见 palette-library.md）：
 
 | 预设 | 定位 | 点缀色 | 对白底 |
 | --- | --- | --- | --- |
 | `A`（默认） | Okabe-Ito 学术蓝（Okabe & Ito；Wong, Nature Methods 2011） | `0072B2` | 5.2:1 |
 | `B` | 深青蓝（沉稳通用） | `283E4E` | 11.2:1 |
 | `C` | 砖红（暖调区分） | `A63603` | 6.1:1 |
+| `D` | 青绿循环：深蓝锚点 + 青绿/暖黄/橙/砖红四档暖色系列（科研五色循环色板） | `26465E` | 9.9:1 |
 
 每套预设是完整的 token 角色表（墨/次级灰/发丝线/图表灰/点缀/点缀深/序列色），不接受只换一个色值的"半套配色"；需要第二点缀色时从该预设的 series 里取，不自造。
 
@@ -158,7 +159,7 @@ python scripts/preview_ppt.py 你的.pptx out.html --slide 0       # 预览（--
 | 项 | 默认 | 改法 |
 | --- | --- | --- |
 | 档位 | `balanced`（学术/答辩场合用 `strict`） | 所有脚本 `--tier fast|balanced|strict`；check_ppt 旧参数 `--mode` 等价 |
-| 配色预设 | `A`（Okabe-Ito 学术蓝） | `--preset A|B|C`；临时换点缀色用 `--accent` |
+| 配色预设 | `A`（Okabe-Ito 学术蓝） | `--preset A|B|C|D`；临时换点缀色用 `--accent` |
 | 字体/字阶/字号下限/备注字数 | 取自当前档位 | `--fonts` `--latin-fonts` `--sizes` `--min-size` `--notes-min` |
 | 额外允许色 | 无 | `--allow-colors` 追加（模板跟随场景） |
 | 例外记录 | 无 | check_ppt `--exceptions exceptions.json`；页面级在备注写 `[例外:规则名]` + 理由 |
@@ -170,7 +171,8 @@ python scripts/preview_ppt.py 你的.pptx out.html --slide 0       # 预览（--
 - `scripts/preview_ppt.py`：pptx → HTML 预览（按 latin + ea 双槽拼字体栈，图表近似渲染）。
 - `references/workflow.md`：完整分阶段流程与返工触发条件。
 - `references/eval-queries.json`：30 条触发测试用例，用于改动 description 后回归触发率。
-- `references/profiles.json`：三档 × 三配色预设的阈值唯一真相源；`scripts/profile_lib.py` 是加载器。
+- `references/profiles.json`：三档 × 四配色预设的阈值唯一真相源；`scripts/profile_lib.py` 是加载器。
+- `references/palette-library.md`：外部色板库（7 组实算对比度），新预设与自定义序列色的选材来源。
 ## 交付与安全
 - 需要改单页时**单独输出一个 pptx**，不覆盖用户正在编辑的源文件。
 - **绝不调用 PowerPoint COM 或操作用户打开的窗口**，只做文件读写。

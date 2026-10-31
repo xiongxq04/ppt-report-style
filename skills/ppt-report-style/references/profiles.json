@@ -1,6 +1,6 @@
 {
-  "$comment": "ppt-report-style 唯一阈值真相源（v0.4.0）。任何文档或脚本与本文件冲突时，以本文件为准。三档严格度 × 三套配色预设。",
-  "version": "0.4.0",
+  "$comment": "ppt-report-style 唯一阈值真相源（v0.4.1）。任何文档或脚本与本文件冲突时，以本文件为准。三档严格度 × 四套配色预设。",
+  "version": "0.4.1",
   "tiers": {
     "fast": {
       "label": "L1 快速档",
@@ -110,6 +110,18 @@
       "accent": "A63603",
       "accent_deep": "7A2702",
       "series": ["7B5EA7", "6B8E23", "E6AB02"],
+      "white": "FFFFFF"
+    },
+    "D": {
+      "label": "P-D 青绿循环（深蓝锚点·暖色系列）",
+      "source": "科研论文五色循环色板（palette-library.md 组6）；hair/chart_neutral/accent_deep 由 generate_scale 从 accent 派生并逐档核对",
+      "ink": "000000",
+      "muted": "6E6E6E",
+      "hair": "EAF0F5",
+      "chart_neutral": "97BAD5",
+      "accent": "26465E",
+      "accent_deep": "1D3648",
+      "series": ["2A9D8F", "E9C46A", "F4A261", "E76F51"],
       "white": "FFFFFF"
     }
   },

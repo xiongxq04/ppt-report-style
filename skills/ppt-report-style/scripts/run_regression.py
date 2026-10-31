@@ -15,6 +15,8 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.stdout.reconfigure(encoding="utf-8")
 
+from profile_lib import preset_names
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL_ROOT = os.path.normpath(os.path.join(HERE, ".."))
 
@@ -73,8 +75,8 @@ def main():
         if len(relations) < 3:
             failures.append(f"正例关系模型不足：{relations}")
 
-    # 三套配色预设端到端冒烟：每套预设生成一份并通过 balanced 档
-    for preset in ("B", "C"):
+    # 全部配色预设端到端冒烟：A 已在上方主流程覆盖，其余预设每套生成一份并通过 balanced 档
+    for preset in tuple(p for p in preset_names() if p != "A"):
         deck = os.path.join(temp_dir, f"positive-{preset}.pptx")
         code, output = run([os.path.join(HERE, "build_example.py"), deck, "--preset", preset])
         report = os.path.join(temp_dir, f"positive-{preset}.json")
