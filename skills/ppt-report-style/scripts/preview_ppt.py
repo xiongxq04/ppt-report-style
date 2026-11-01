@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """把 pptx 渲染成 HTML 预览（形状、文字、图片、表格、图表近似渲染），用于交付前自检。
 
-用法: python preview_ppt.py <file.pptx> <out.html> [--accent 788C5D] [--slide 0]
+用法: python preview_ppt.py <file.pptx> <out.html> [--accent 0072B2] [--slide 0]
 说明: 图表按数据近似绘制，用于检查布局/溢出/对齐，不等于 PowerPoint 的最终渲染。
 """
-import sys, os, base64, html as _h, argparse
+import sys, base64, html as _h, argparse
 sys.stdout.reconfigure(encoding="utf-8")
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE, MSO_SHAPE
@@ -21,7 +21,12 @@ args = ap.parse_args()
 ACCENT = "#" + args.accent.lstrip("#").upper()
 BAND = "#" + args.band.lstrip("#").upper()
 
-prs = Presentation(args.src); sl = prs.slides[args.slide]
+prs = Presentation(args.src)
+try:
+    sl = prs.slides[args.slide]
+except IndexError:
+    print(f"页码越界：--slide {args.slide}，共 {len(prs.slides)} 页（0 基）")
+    raise SystemExit(2)
 EMU = 914400.0; DPI = 96.0
 W = prs.slide_width/EMU*DPI; H = prs.slide_height/EMU*DPI
 
@@ -112,16 +117,16 @@ def chart_html(sh, l, t, w, h):
             for i, (c, v) in enumerate(zip(cats, vals)):
                 bh = max(1.0, avail*abs(v)/mx); x = gap+i*(bw+gap); y = pad_t+avail-bh
                 body += ("<div style='position:absolute;left:%.1fpx;top:%.1fpx;width:%.1fpx;height:%.1fpx;background:%s'></div>"
-                         "<div style='position:absolute;left:%.1fpx;top:%.1fpx;width:%.1fpx;text-align:center;font:16px bold;color:%s'>%s</div>"
-                         "<div style='position:absolute;left:%.1fpx;top:%.1fpx;width:%.1fpx;text-align:center;font:16px color:#000;white-space:nowrap'>%s</div>"
+                         "<div style='position:absolute;left:%.1fpx;top:%.1fpx;width:%.1fpx;text-align:center;font-size:16px;font-weight:bold;color:%s'>%s</div>"
+                         "<div style='position:absolute;left:%.1fpx;top:%.1fpx;width:%.1fpx;text-align:center;font-size:16px;color:#000;white-space:nowrap'>%s</div>"
                          % (x, y, bw, bh, pcolors[i] if pcolors else ACCENT, x-6, y-20, bw+12, ACCENT, '%g'%v, x-10, pad_t+avail+8, bw+20, c))
         else:
             lab_w = w*0.34; bar_x = lab_w+6; avail = w-bar_x-8; rowh = h/max(len(vals), 1)
             for i, (c, v) in enumerate(zip(cats, vals)):
                 bh = min(rowh*0.5, 44); y = i*rowh+(rowh-bh)/2; bwd = max(2.0, avail*abs(v)/mx)
-                body += ("<div style='position:absolute;left:0;top:%.1fpx;width:%.1fpx;text-align:right;font:16px color:#000;white-space:nowrap'>%s</div>"
+                body += ("<div style='position:absolute;left:0;top:%.1fpx;width:%.1fpx;text-align:right;font-size:16px;color:#000;white-space:nowrap'>%s</div>"
                          "<div style='position:absolute;left:%.1fpx;top:%.1fpx;width:%.1fpx;height:%.1fpx;background:%s'></div>"
-                         "<div style='position:absolute;left:%.1fpx;top:%.1fpx;font:16px bold;color:%s;white-space:nowrap'>%s</div>"
+                         "<div style='position:absolute;left:%.1fpx;top:%.1fpx;font-size:16px;font-weight:bold;color:%s;white-space:nowrap'>%s</div>"
                          % (y+bh/2-10, lab_w, c, bar_x, y, bwd, bh, pcolors[i] if pcolors else ACCENT, bar_x+bwd+6, y+bh/2-10, ACCENT, '%g'%v))
     return "<div class=sh style='left:%.2fpx;top:%.2fpx;width:%.2fpx;height:%.2fpx'>%s</div>" % (l, t, w, h, body)
 
@@ -158,10 +163,11 @@ for sh in sl.shapes:
         parts.append(chart_html(sh, l, t, w, h)); continue
     if sh.shape_type == MSO_SHAPE_TYPE.PICTURE:
         b64 = base64.b64encode(sh.image.blob).decode()
+        mime = getattr(sh.image, "content_type", None) or "image/jpeg"
         nw, nh = sh.image.size; cl, ct2, cr, cb = sh.crop_left, sh.crop_top, sh.crop_right, sh.crop_bottom
         vw = nw*(1-cl-cr); sc = w/vw if vw else 1
-        parts.append("<div class=sh style='%s;overflow:hidden'><img style='position:absolute;left:%.2fpx;top:%.2fpx;width:%.2fpx;height:%.2fpx' src='data:image/jpeg;base64,%s'></div>"
-                     % (st, -cl*nw*sc, -ct2*nh*sc, nw*sc, nh*sc, b64)); continue
+        parts.append("<div class=sh style='%s;overflow:hidden'><img style='position:absolute;left:%.2fpx;top:%.2fpx;width:%.2fpx;height:%.2fpx' src='data:%s;base64,%s'></div>"
+                     % (st, -cl*nw*sc, -ct2*nh*sc, nw*sc, nh*sc, mime, b64)); continue
     fill = None; border = ""
     try:
         if sh.fill.type == MSO_FILL.SOLID: fill = rgb(sh.fill.fore_color)

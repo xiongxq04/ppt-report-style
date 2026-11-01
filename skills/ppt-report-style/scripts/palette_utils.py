@@ -18,7 +18,7 @@ import sys
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from profile_lib import get_preset, preset_names, preset_all_colors
+from profile_lib import get_preset, preset_names
 
 # —— 默认点缀色（= 预设 A 的 accent）——
 ACCENT_DEFAULT = "0072B2"

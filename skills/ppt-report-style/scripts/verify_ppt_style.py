@@ -25,10 +25,10 @@ except ImportError:
     print("需要 python-pptx：pip install python-pptx"); sys.exit(2)
 
 from profile_lib import (get_tier, get_preset, preset_colors, accent_family, is_hf_zone,
-                         expand_font_whitelist, note_exception_rules)
+                         expand_font_whitelist, note_exception_rules, note_exception_unknown,
+                         SAFETY_RULES, CJK_FACES)
 from palette_utils import contrast_ratio, hue_group, is_neutral, normalize_hex
 
-CJK_FACES = {"宋体", "楷体", "黑体", "SimSun", "KaiTi", "SimHei", "MS Mincho", "Microsoft YaHei"}
 HEI_FACES = {"黑体", "SimHei"}   # 黑体不再叠加粗体（合成粗糊边）
 PREFIXES = ("结论：", "判断：", "收束：")
 CAVEAT_WORDS = ("虚构", "示例")
@@ -46,12 +46,22 @@ def _solid_fill_hex(shape):
     return None
 
 
+def _cell_fill_hex(cell):
+    """表格单元格的 solid 填充色（大写 HEX）；无填充或继承表格样式时返回 None。"""
+    try:
+        if cell.fill.type == 1:       # MSO_FILL.SOLID
+            return normalize_hex(str(cell.fill.fore_color.rgb))
+    except Exception:
+        pass
+    return None
+
+
 def _effective_bg(shape, order, fills, pic_rects=(), default="FFFFFF"):
     """文字的实际底色：自身 solid 填充优先；否则取文档序在先、盖住文字中心的
     最近一个非白填充形状（z 序 = 文档序，后者在上）。找不到则按白底。
     文字压在图片上时底色不可判定，返回 None（跳过对比度检查，由 GEO.OVERLAP_VISUAL 兜底）。"""
     own = _solid_fill_hex(shape)
-    if own and own != default:
+    if own:
         return own
     try:
         cl = shape.left / EMU_IN
@@ -66,7 +76,7 @@ def _effective_bg(shape, order, fills, pic_rects=(), default="FFFFFF"):
             return None
     bg = default
     for f_order, fl, ft, fw, fh, fx in fills:
-        if f_order >= order or fx == default:
+        if f_order >= order:
             continue
         if fl <= cx <= fl + fw and ft <= cy <= ft + fh:
             bg = fx
@@ -117,6 +127,9 @@ def _shape_uses_accent(shape, accent_set):
     if getattr(shape, "has_table", False):
         for row in shape.table.rows:
             for cell in row.cells:
+                fill = _cell_fill_hex(cell)
+                if fill and fill in accent_set:
+                    return True
                 for p in cell.text_frame.paragraphs:
                     for r in p.runs:
                         col = _run_color(r)
@@ -124,33 +137,36 @@ def _shape_uses_accent(shape, accent_set):
                             return True
     if getattr(shape, "has_chart", False):
         try:
-            xml = shape.chart._chartSpace.xml.upper()
-            if any(("#" + c) in xml or c in xml for c in accent_set):
-                return True
+            for sc in shape.chart._chartSpace.iter(qn("a:srgbClr")):
+                if (sc.get("val") or "").upper() in accent_set:
+                    return True
         except Exception:
             pass
     return False
 
 
 def _chart_accent_marks(shape, accent_set):
-    """图表里被点缀色点亮的标记数：逐点(dPt)填充逐个计；无点缀点填充时系列底色算 1。"""
+    """图表里被点缀色点亮的标记数：逐点(dPt)的填充/描边逐个计；无点缀点时系列
+    填充/描边算 1。只看 spPr，避免把数据标签的文字颜色误计成"点亮"。"""
+    def sp_pr_colors(element):
+        sp_pr = element.find(qn("c:spPr"))
+        if sp_pr is None:
+            return set()
+        return {(sc.get("val") or "").upper() for sc in sp_pr.iter(qn("a:srgbClr"))}
+
     marks = 0
     try:
         cs = shape.chart._chartSpace
         for ser in cs.iter(qn("c:ser")):
             dpt_accent = 0
             for dpt in ser.iter(qn("c:dPt")):
-                for sc in dpt.iter(qn("a:srgbClr")):
-                    if (sc.get("val") or "").upper() in accent_set:
-                        dpt_accent += 1
-                        break
+                if sp_pr_colors(dpt) & accent_set:
+                    dpt_accent += 1
             marks += dpt_accent
             if dpt_accent:
                 continue  # 点级已点亮时，系列底色不重复计
-            for sc in ser.iter(qn("a:srgbClr")):
-                if (sc.get("val") or "").upper() in accent_set:
-                    marks += 1
-                    break
+            if sp_pr_colors(ser) & accent_set:
+                marks += 1
     except Exception:
         return 0
     return marks
@@ -191,11 +207,18 @@ def check(path, tier="balanced", preset="A",
         if slide.has_notes_slide:
             notes = slide.notes_slide.notes_text_frame.text.strip()
         note_exc = note_exception_rules(notes)
+        for raw in note_exception_unknown(notes):
+            findings.append(_finding("SUGGESTION", si, "NOTE.EXCEPTION_UNKNOWN",
+                                     "例外标记无法识别", f"[例外:{raw}]",
+                                     "规则 ID 见 checking.md；中文写法仅兼容『骨架重复』"))
 
         def add(sev, rule, kind, detail, extra=""):
             if rule in note_exc:      # 备注级例外：[例外:规则名] 降级为「例外」，保留可追溯
-                sev = "例外"
-                extra = (extra + "；" if extra else "") + "备注声明 [例外:" + rule + "]"
+                if rule in SAFETY_RULES:
+                    extra = ((extra + "；") if extra else "") + "例外声明被拒绝（安全规则不可例外）"
+                else:
+                    sev = "例外"
+                    extra = ((extra + "；") if extra else "") + "备注声明 [例外:" + rule + "]"
             findings.append(_finding(sev, si, rule, kind, detail, extra))
 
         def walk_runs(runs, top_in=None, h_in=None, in_table=False, bg="FFFFFF"):
@@ -214,9 +237,9 @@ def check(path, tier="balanced", preset="A",
                 elif sz < local_floor:
                     add(err, "TYP.MINSIZE", "字号过小", r.text[:20],
                         f"{sz}pt < {local_floor}pt" + ("（页眉页脚档）" if hf_ok else ""))
-                if sz is not None:
+                if sz is not None and not hf_ok:
                     steps.add(sz)
-                    if size_ok and sz not in size_ok and not hf_ok:
+                    if size_ok and sz not in size_ok:
                         add(err, "TYP.LADDER", "字号不在字阶内", r.text[:20],
                             f"{sz}pt，字阶={sorted(size_ok)}")
                     poster = T["poster_pt"]
@@ -231,9 +254,7 @@ def check(path, tier="balanced", preset="A",
                 else:
                     if not is_neutral(col):
                         page_colors.add(col)
-                    if col in accent_set:
-                        pass  # 点缀按形状计数，不在此处计
-                    elif not hf_ok and bg is not None:
+                    if not hf_ok and bg is not None:
                         ratio = contrast_ratio(col, bg)
                         if ratio < 4.5:
                             add(err, "PAL.CONTRAST", "对比度不足", r.text[:16],
@@ -255,7 +276,7 @@ def check(path, tier="balanced", preset="A",
                         add(T["font_slot_severity"], "FONT.LATIN", "西文字体越界", r.text[:16], lat)
                 if r.font.bold and ea in HEI_FACES:
                     add(T["black_bold_severity"], "FONT.EA_BOLD", "黑体叠加粗体", r.text[:16], "合成粗会糊边；强调改换字体或点缀色")
-                if in_table and ea == "楷体":
+                if in_table and ea in ("楷体", "KaiTi"):
                     add(err, "FONT.TABLE_KAI", "楷体入表格", r.text[:16], "表格只用宋体/黑体")
 
         for order, shp in enumerate(slide.shapes):
@@ -284,8 +305,11 @@ def check(path, tier="balanced", preset="A",
             if getattr(shp, "has_table", False):
                 for row in shp.table.rows:
                     for cell in row.cells:
+                        fill = _cell_fill_hex(cell)
+                        if fill and not is_neutral(fill):
+                            page_colors.add(fill)    # PAL.HUE：单元格底色也占色相额度
                         walk_runs([r for p in cell.text_frame.paragraphs for r in p.runs],
-                                  None, None, in_table=True)
+                                  None, None, in_table=True, bg=fill or "FFFFFF")
             if getattr(shp, "has_chart", False):
                 try:
                     cs = shp.chart._chartSpace
@@ -346,7 +370,7 @@ def check(path, tier="balanced", preset="A",
     for item in findings:
         key = (item[1], item[2])
         seen[key] = seen.get(key, 0) + 1
-        if seen[key] <= max_per_rule:
+        if max_per_rule is None or seen[key] <= max_per_rule:
             folded.append(item)
     return folded
 

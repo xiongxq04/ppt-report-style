@@ -23,8 +23,77 @@ HF_ZONE_TOP_MIN = 7.00     # top ≥ 7.00 视为页脚区
 FONT_ALIASES = {"宋体": "SimSun", "黑体": "SimHei", "楷体": "KaiTi",
                 "微软雅黑": "Microsoft YaHei", "仿宋": "FangSong"}
 
+# 可判定为"中文字形"的字体集合（audit / verify 共用，避免两处副本分叉）
+CJK_FACES = {"宋体", "楷体", "黑体", "微软雅黑", "仿宋",
+             "SimSun", "KaiTi", "SimHei", "Microsoft YaHei", "FangSong", "MS Mincho"}
+
 # 备注级例外标记：[例外:规则名]（checking.md 例外机制）
-NOTE_EXCEPTION_RE = re.compile(r"\[例外[:：]\s*([A-Z]{2,8}\.[A-Z_]{2,})\s*\]")
+NOTE_EXCEPTION_RE = re.compile(r"\[例外[:：]\s*([^\]]+?)\s*\]")
+
+# 规则 ID 注册表：备注例外、--exceptions JSON、文档对账共用一套词表
+RULE_IDS = frozenset({
+    "EFF.SHADOW", "EFF.STYLE_REF",
+    "FONT.EA", "FONT.EA_BOLD", "FONT.LATIN", "FONT.LATIN_CJK", "FONT.TABLE_KAI",
+    "GEO.OUTSIDE", "GEO.OVERLAP_VISUAL", "GEO.TABLE_WIDTH",
+    "IMG.MISSING", "IMG.QUALITY", "IMG.RES",
+    "LAY.MEANS", "LAY.PURETEXT", "LAY.REPEAT",
+    "MED.SMARTART",
+    "NOTE.SHORT", "NOTE.EXCEPTION_UNKNOWN",
+    "PAL.ACCENT_PAGE", "PAL.CHARTCOLOR", "PAL.CHART_SERIES", "PAL.COLOR",
+    "PAL.CONTRAST", "PAL.HUE", "PAL.INHERIT",
+    "TXT.CAVEAT", "TXT.FULLWIDTH", "TXT.GLYPH", "TXT.NOBREAK", "TXT.OVERFLOW",
+    "TXT.OVERLAP", "TXT.PREFIX", "TXT.TABLE_OVERFLOW",
+    "TYP.CHARTSIZE", "TYP.INHERIT", "TYP.LADDER", "TYP.MINSIZE", "TYP.POSTER",
+    "TYP.STEPS",
+})
+
+# 安全规则：例外机制不得降级（checking.md 例外机制）
+SAFETY_RULES = frozenset({
+    "EFF.SHADOW", "EFF.STYLE_REF",
+    "GEO.OUTSIDE",
+    "IMG.MISSING", "IMG.RES",
+    "MED.SMARTART",
+    "PAL.CONTRAST",
+    "TXT.NOBREAK", "TXT.OVERFLOW", "TXT.TABLE_OVERFLOW",
+    "TYP.MINSIZE",
+})
+
+# 备注例外的中文兼容别名（规范写法仍是规则 ID）
+NOTE_ALIASES = {"骨架重复": "LAY.REPEAT"}
+
+
+def normalize_rule_id(raw):
+    """把例外标记里的名字规范化为规则 ID；无法识别返回 None。"""
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    if text in RULE_IDS:
+        return text
+    if text in NOTE_ALIASES:
+        return NOTE_ALIASES[text]
+    upper = text.upper()
+    if upper in RULE_IDS:
+        return upper
+    return None
+
+
+def note_exception_rules(notes_text):
+    """解析备注里的 [例外:规则名] 标记，返回已知规则 ID 集合。"""
+    rules = set()
+    for raw in NOTE_EXCEPTION_RE.findall(notes_text or ""):
+        rule = normalize_rule_id(raw)
+        if rule:
+            rules.add(rule)
+    return rules
+
+
+def note_exception_unknown(notes_text):
+    """返回无法识别的例外标记原文列表（用于给出 SUGGESTION，避免静默失效）。"""
+    unknown = []
+    for raw in NOTE_EXCEPTION_RE.findall(notes_text or ""):
+        if normalize_rule_id(raw) is None:
+            unknown.append(str(raw).strip())
+    return unknown
 
 
 def load_profiles():
@@ -94,11 +163,6 @@ def expand_font_whitelist(names):
             elif name == en:
                 out.add(zh)
     return out
-
-
-def note_exception_rules(notes_text):
-    """解析备注里的 [例外:规则名] 标记，返回规则 ID 集合。"""
-    return set(NOTE_EXCEPTION_RE.findall(notes_text or ""))
 
 
 def tier_names():

@@ -16,15 +16,14 @@ from pptx.oxml import parse_xml
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from profile_lib import get_preset as _get_preset, preset_names as _preset_names
+from profile_lib import get_preset as _get_preset
 _ap = argparse.ArgumentParser()
 _ap.add_argument("out", nargs="?", default=os.path.join(HERE, "..", "assets", "example-slide.pptx"),
                  help="输出路径（兼容旧用法：位置参数）")
-_ap.add_argument("--variant", choices=("academic", "negative"), default="academic",
-                 help="academic=6 页正例；negative=回归反例（故意违规）")
+_ap.add_argument("--variant", choices=("academic", "negative", "guard", "safety"), default="academic",
+                 help="academic=6 页正例；negative=回归反例；guard=正例变体；safety=安全例外反例")
 _ap.add_argument("--out", dest="out_opt", default=None, help="输出路径（与位置参数二选一）")
-_ap.add_argument("--preset", default="A", choices=tuple(_preset_names()),
-                 help="配色预设（见 references/profiles.json）")
+_ap.add_argument("--preset", default="A", help="配色预设 A|B|C|D（大小写均可）")
 _a = _ap.parse_args()
 OUT = _a.out_opt or _a.out
 VARIANT = _a.variant
@@ -299,6 +298,100 @@ def _png_bytes(width, height, rgb=(200, 60, 60)):
             + chunk(b"IEND", b""))
 
 
+def _add_smartart(slide):
+    """注入一个顶层 diagram graphicFrame（伪 SmartArt），用于回归反例。"""
+    dgm_ns = ('xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" '
+              'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"')
+    frame = parse_xml(
+        '<p:graphicFrame %s><p:nvGraphicFramePr><p:cNvPr id="99" name="Diagram 1"/>'
+        '<p:cNvGraphicFramePr/></p:nvGraphicFramePr>'
+        '<p:xfrm><a:off x="914400" y="914400"/><a:ext cx="2743200" cy="2743200"/></p:xfrm>'
+        '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/diagram">'
+        '<dgm:relIds %s r:dm="rId901" r:lo="rId902" r:qs="rId903" r:cs="rId904"/>'
+        '</a:graphicData></a:graphic></p:graphicFrame>'
+        % (nsdecls("p", "a"), dgm_ns))
+    slide.shapes._spTree.append(frame)
+
+
+def _long_note():
+    return "本页备注用于回归守护：这段逐字稿刻意写长，覆盖口径、来源与备答，确保不会触发备注字数下限。" * 4
+
+
+def build_guard(path):
+    """回归正例变体：固定行距 / 白底卡片 / 深底白字表头 / 点缀图表，要求零误报。"""
+    prs = Presentation(); prs.slide_width = 12192000; prs.slide_height = 6858000
+    BL = prs.slide_layouts[6]
+
+    s = prs.slides.add_slide(BL)                       # P1 固定值行距
+    title_block(s, "固定行距不应被误判溢出", "回归正例变体")
+    text(s, ML, 2.55, 8.0, 0.90,
+         [("这一行使用固定值行距 24pt，框高足够，不应报文本溢出。", BLACK, SONG)], 18, ls=Pt(24))
+    s.notes_slide.notes_text_frame.text = _long_note()
+
+    s = prs.slides.add_slide(BL)                       # P2 白卡压点缀横幅
+    title_block(s, "白底卡片压点缀色横幅", "实际底色按白卡判定")
+    rect(s, ML, 2.40, CW, 1.80, fill=ACC)
+    card = text(s, ML + 0.40, 2.85, 8.0, 0.80,
+                [("白卡上的黑字，实际底色是白色，不应报对比度不足。", BLACK, SONG)],
+                18, anchor=MSO_ANCHOR.MIDDLE)
+    card.fill.solid(); card.fill.fore_color.rgb = RGBColor.from_string(WHITE)
+    s.notes_slide.notes_text_frame.text = _long_note()
+
+    s = prs.slides.add_slide(BL)                       # P3 深底白字表头
+    title_block(s, "深底白字表头应按单元格底色判定", "表格回归")
+    shape = s.shapes.add_table(2, 3, Inches(ML), Inches(2.55), Inches(12.29), Inches(1.10))
+    tbl = shape.table
+    for ci, width in enumerate([4.29, 4.00, 4.00]):
+        tbl.columns[ci].width = Inches(width)
+    for ri, values in enumerate([["指标", "数值 A", "数值 B"], ["一致性", "0.86", "0.78"]]):
+        tbl.rows[ri].height = Inches(0.55)
+        for ci, val in enumerate(values):
+            cell = tbl.cell(ri, ci)
+            cell.margin_left = Inches(0.14); cell.margin_right = Inches(0.10)
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = RGBColor.from_string(ACC if ri == 0 else WHITE)
+            run = cell.text_frame.paragraphs[0].add_run(); run.text = val
+            font(run, 16, WHITE if ri == 0 else BLACK, HEI)
+    s.notes_slide.notes_text_frame.text = _long_note()
+
+    s = prs.slides.add_slide(BL)                       # P4 点缀图表
+    title_block(s, "图表只点亮一处点缀", "图表回归")
+    data = CategoryChartData(); data.categories = ["甲", "乙", "丙"]
+    data.add_series("值", (0.4, 0.6, 0.8))
+    frame = s.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED,
+                               Inches(ML), Inches(2.55), Inches(8.0), Inches(3.0), data)
+    chart_obj = frame.chart; chart_obj.has_legend = False
+    chart_obj.font.size = Pt(16); chart_obj.font.name = "Arial"
+    chart_obj.font.color.rgb = RGBColor.from_string(BLACK)
+    series = chart_obj.plots[0].series[0]
+    for index, point in enumerate(series.points):
+        point.format.fill.solid()
+        point.format.fill.fore_color.rgb = RGBColor.from_string(ACC if index == 0 else BAR)
+    chart_cn_font(chart_obj)
+    s.notes_slide.notes_text_frame.text = _long_note()
+
+    prs.save(path)
+    print("saved(guard)", os.path.normpath(path))
+
+
+def build_safety(path):
+    """回归反例：备注例外声明安全规则（阴影/对比度），必须仍按 ERROR 报出。"""
+    prs = Presentation(); prs.slide_width = 12192000; prs.slide_height = 6858000
+    s = prs.slides.add_slide(prs.slide_layouts[6])
+    text(s, ML, 1.00, 12.29, 0.63, [("安全规则不可被备注例外降级", BLACK, HEI)], 30)
+    shape = rect(s, ML, 2.40, 6.0, 1.20, fill=WHITE, line=HAIR)
+    shape._element.spPr.append(parse_xml(
+        '<a:effectLst %s><a:outerShdw blurRad="63500" dist="38100" dir="5400000" algn="ctr" rotWithShape="0">'
+        '<a:srgbClr val="000000"><a:alpha val="38000"/></a:srgbClr></a:outerShdw></a:effectLst>'
+        % nsdecls("a")))
+    text(s, ML, 3.90, 10.0, 0.50,
+         [("这一行用图表灰当正文色，对比度不足。", "BFBFBF", SONG)], 18)
+    s.notes_slide.notes_text_frame.text = (
+        "[例外:EFF.SHADOW] [例外:PAL.CONTRAST] " + _long_note())
+    prs.save(path)
+    print("saved(safety)", os.path.normpath(path))
+
+
 def build_negative(path):
     """回归反例：在 balanced 档下必须命中预期规则集（见 run_regression.py）。"""
     prs = Presentation(); prs.slide_width = 12192000; prs.slide_height = 6858000
@@ -384,12 +477,24 @@ def build_negative(path):
     text(s, ML, 3.00, 12.29, 0.44, [("结论：反例到此结束。", BLACK, SONG)], 18)
     note(s)
 
+    # P9：顶层 SmartArt（伪 diagram graphicFrame）→ MED.SMARTART
+    s = prs.slides.add_slide(BL)
+    text(s, ML, 1.00, 12.29, 0.63, [("本页含一个顶层 SmartArt 对象", BLACK, HEI)], 30)
+    _add_smartart(s)
+    note(s)
+
     prs.save(path)
     print("saved(negative)", os.path.normpath(path))
 
 
 if VARIANT == "negative":
     build_negative(OUT)
+    sys.exit(0)
+if VARIANT == "guard":
+    build_guard(OUT)
+    sys.exit(0)
+if VARIANT == "safety":
+    build_safety(OUT)
     sys.exit(0)
 
 prs.save(OUT)

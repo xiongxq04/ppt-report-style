@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.stdout.reconfigure(encoding="utf-8")
 
 from audit_ppt import audit, format_findings, format_layout
-from profile_lib import get_tier, get_preset, preset_colors, preset_names
+from profile_lib import get_tier, get_preset, RULE_IDS, SAFETY_RULES
 from verify_ppt_style import check as style_check
 
 SEVERITY_ORDER = {"ERROR": 0, "WARNING": 1, "SUGGESTION": 2, "例外": 3}
@@ -38,7 +38,10 @@ def load_exceptions(path):
     for item in data:
         if not isinstance(item, dict) or not item.get("rule"):
             continue
-        rules.append({"rule": item["rule"],
+        rule = str(item["rule"]).strip()
+        if rule not in RULE_IDS:
+            raise ValueError(f"未知规则 ID：{rule}")
+        rules.append({"rule": rule,
                       "slides": {int(value) for value in (item.get("slides") or [])},
                       "reason": item.get("reason", "未填写理由")})
     return rules
@@ -56,10 +59,30 @@ def apply_exceptions(findings, rules):
                 break
         if hit is None:
             kept.append(item)
+        elif rule in SAFETY_RULES:
+            marker = "例外声明被拒绝（安全规则不可例外）"
+            if marker in (extra or ""):
+                note = extra
+            else:
+                note = f"{extra}；{marker}" if extra else marker
+            kept.append((severity, slide_no, rule, kind, detail, note))
         else:
             note = f"{extra}；例外理由：{hit['reason']}" if extra else f"例外理由：{hit['reason']}"
             excepted.append(("例外", slide_no, rule, kind, detail, note))
     return kept, excepted
+
+
+def fold_findings(items, cap):
+    """同页同规则最多报 cap 条；audit 与 verify 合并后统一执行。"""
+    if not cap:
+        return items
+    folded, seen = [], {}
+    for item in items:
+        key = (item[1], item[2])
+        seen[key] = seen.get(key, 0) + 1
+        if seen[key] <= cap:
+            folded.append(item)
+    return folded
 
 
 def main():
@@ -68,7 +91,7 @@ def main():
     parser.add_argument("--mode", choices=("balanced", "strict"), default=None,
                         help="兼容旧参数；等价于 --tier")
     parser.add_argument("--tier", choices=("fast", "balanced", "strict"), default=None)
-    parser.add_argument("--preset", default="A", choices=tuple(preset_names()))
+    parser.add_argument("--preset", default="A", help="配色预设 A|B|C|D（大小写均可）")
     parser.add_argument("--min-size", type=float, default=None)
     parser.add_argument("--accent", default=None, help="临时覆盖预设点缀色")
     parser.add_argument("--contrast-color", default=None, help="兼容旧参数（已并入预设，忽略）")
@@ -114,7 +137,7 @@ def main():
         min_size=args.min_size,
         max_steps=args.max_steps,
         allow_cjk_latin=args.allow_cjk_latin,
-        max_per_rule=args.max_per_rule,
+        max_per_rule=None,   # 折叠在合并后统一执行，避免 audit 侧漏网
     )
     # 确定性合并：audit 与 verify 对同一发现各报一次（如 FONT.EA 的两种措辞）时按
     # (页码, 规则, 对象) 去重，保留结构侧；再按 (页码, 严重度, 规则) 稳定排序。
@@ -133,6 +156,9 @@ def main():
         except Exception as error:
             print("例外文件读取失败:", error)
             return 2
+    if args.max_per_rule:
+        ordered = fold_findings(ordered, args.max_per_rule)
+        excepted = fold_findings(excepted, args.max_per_rule)
 
     counts = {"ERROR": 0, "WARNING": 0, "SUGGESTION": 0}
     for severity, *_ in ordered:
@@ -140,8 +166,9 @@ def main():
 
     print(f"文件: {os.path.abspath(args.file)}")
     print(f"档位: {T['label']}（{tier}） · 预设: {P['label']}（{args.preset}）")
+    exception_count = sum(1 for item in ordered + excepted if item[0] == "例外")
     print(f"结果: {counts['ERROR']} 个错误，{counts['WARNING']} 个警告，"
-          f"{counts['SUGGESTION']} 个建议，{len(excepted)} 条例外")
+          f"{counts['SUGGESTION']} 个建议，{exception_count} 条例外")
     if ordered or excepted:
         print(format_findings(ordered + excepted))
     if args.layout_report:
@@ -171,7 +198,8 @@ def main():
     exit_code = 1 if counts["ERROR"] else 0
     if args.preview_out:
         preview_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "preview_ppt.py")
-        completed = subprocess.run([sys.executable, preview_script, args.file, args.preview_out],
+        completed = subprocess.run([sys.executable, preview_script, args.file, args.preview_out,
+                                    "--accent", P["accent"]],
                                    check=False)
         if completed.returncode != 0:
             print("预览生成失败")

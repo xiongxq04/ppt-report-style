@@ -11,7 +11,7 @@
   --notes-min N          每页备注最少字数覆盖（缺省取档位值）
   --overflow-tol         溢出容差倍数，默认 1.06
   --allow-smartart       保留模板 SmartArt 时放行 MED.SMARTART
-退出码 0 = 全部通过。
+退出码 0 = 无 ERROR（警告/建议/例外不影响退出码）。
 
 中英混排三条硬道理（判定依据）：
 1. 宽度按字符分类取 em 宽，宁可估宽不漏报；
@@ -20,7 +20,6 @@
 """
 import sys
 import os
-import math
 import argparse
 import unicodedata
 
@@ -29,14 +28,17 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
     from pptx import Presentation
     from pptx.oxml.ns import qn
+    from pptx.util import Length
+    from pptx.enum.shapes import PP_PLACEHOLDER
 except ImportError:
     print("需要 python-pptx：pip install python-pptx"); sys.exit(2)
 
-from profile_lib import get_tier, get_preset, expand_font_whitelist, note_exception_rules
+from profile_lib import (get_tier, get_preset, expand_font_whitelist, note_exception_rules,
+                         note_exception_unknown, SAFETY_RULES, is_hf_zone, CJK_FACES)
+from palette_utils import normalize_hex
 
 EMU_IN = 914400.0
 EMU_PT = 12700.0
-CJK_FACES = {"宋体", "楷体", "黑体", "微软雅黑", "SimSun", "KaiTi", "SimHei", "Microsoft YaHei"}
 NARROW_LATIN = set("ijlrtf|.,:;'\"()[]{}/!-\\` ")
 WIDE_LATIN = set("mwMW@%&")
 
@@ -110,7 +112,7 @@ def has_latin(s):
 
 def _classify_skeleton(text_boxes, charts, tables, pictures, sw, sh_):
     """保守估算页面骨架；分错的风险交给人工审阅（checking.md 约定）。"""
-    if tables and any(t[3] > 0.65 * sw for t in tables):
+    if tables and any(t[2] > 0.65 * sw for t in tables):
         return "全宽单栏"
     if pictures or charts:
         for l, t, w, h in charts + pictures:
@@ -147,6 +149,102 @@ def _relation(tables, charts, blocks):
     return "其他"
 
 
+def line_spacing_factor(paragraph, size):
+    """段落的行距倍数。python-pptx 的 Length 是 int 子类，必须先于数值判断，
+    否则「固定值行距」（如 Pt(24)）会被当成 30 万倍行距。"""
+    spacing = paragraph.line_spacing
+    if isinstance(spacing, Length):
+        return spacing.pt / size if size else 1.0
+    if isinstance(spacing, (int, float)):
+        return max(spacing, 1.0)
+    return 1.0
+
+
+def run_color_hex(run):
+    """run 的显式颜色（大写 HEX）；继承或主题色返回 None。"""
+    try:
+        return normalize_hex(str(run.font.color.rgb))
+    except Exception:
+        return None
+
+
+def title_placeholder_size(slide):
+    """标题占位符的生效字号：按 形状 → 版式 → 母版占位符 → 母版 txStyles 的顺序回落。"""
+    try:
+        title = slide.shapes.title
+    except Exception:
+        title = None
+    if title is None:
+        return None
+    candidates = [title]
+    try:
+        idx = title.placeholder_format.idx
+        for placeholder in slide.slide_layout.placeholders:
+            if placeholder.placeholder_format.idx == idx:
+                candidates.append(placeholder)
+        for placeholder in slide.slide_layout.slide_master.placeholders:
+            if placeholder.placeholder_format.idx == idx:
+                candidates.append(placeholder)
+    except Exception:
+        pass
+
+    def size_from_defrpr(element):
+        if element is None:
+            return None
+        for defrpr in element.iter(qn("a:defRPr")):
+            raw = defrpr.get("sz")
+            if raw:
+                return int(raw) / 100.0
+        return None
+
+    for candidate in candidates:
+        try:
+            for paragraph in candidate.text_frame.paragraphs:
+                if paragraph.font.size:
+                    return paragraph.font.size.pt
+                for run in paragraph.runs:
+                    if run.font.size:
+                        return run.font.size.pt
+        except Exception:
+            pass
+        try:
+            found = size_from_defrpr(candidate._element.find(".//" + qn("a:lstStyle")))
+            if found:
+                return found
+        except Exception:
+            pass
+    try:
+        styles = slide.slide_layout.slide_master._element.find(qn("p:txStyles"))
+        if styles is not None:
+            found = size_from_defrpr(styles.find(qn("p:titleStyle")))
+            if found:
+                return found
+    except Exception:
+        pass
+    return None
+
+
+def placeholder_title_exempt(slide):
+    """占位符版的封面/章节页判定：标题字号够大，且没有带文字的正文占位符。
+    返回生效标题字号；带正文占位符（BODY/OBJECT 且有文字）时返回 None，
+    避免把模板里的普通内容页当成封面。"""
+    size = title_placeholder_size(slide)
+    if size is None:
+        return None
+    try:
+        for placeholder in slide.placeholders:
+            try:
+                ph_type = placeholder.placeholder_format.type
+            except Exception:
+                continue
+            if ph_type in (PP_PLACEHOLDER.BODY, PP_PLACEHOLDER.OBJECT):
+                if placeholder.has_text_frame and placeholder.text_frame.text.strip():
+                    return None
+    except Exception:
+        pass
+    return size
+
+
 def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
           notes_min=None, tol=1.06, allow_smartart=False):
     """返回 (findings, layout_rows)。
@@ -154,6 +252,8 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
     layout_rows: (slide_no, relation, skeleton, means, pure_text)"""
     T = get_tier(tier)
     P = get_preset(preset)
+    # 封面/章节页豁免的标题字号档：取档位的海报阈值（fast 档为 null，按 36pt 兜底）
+    exempt_pt = T["poster_pt"] if T["poster_pt"] is not None else 36
     issues = []
     layout_rows = []
     note_exc_by_slide = {}
@@ -176,19 +276,26 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
             notes = slide.notes_slide.notes_text_frame.text.strip()
         note_exc = note_exception_rules(notes)
         note_exc_by_slide[si] = note_exc
+        for raw in note_exception_unknown(notes):
+            issues.append(("SUGGESTION", si, "NOTE.EXCEPTION_UNKNOWN", "例外标记无法识别",
+                           f"[例外:{raw}]", "规则 ID 见 checking.md；中文写法仅兼容『骨架重复』"))
 
         def add(sev, rule, kind, detail, extra=""):
             if rule in note_exc:      # 备注级例外：[例外:规则名] 降级为「例外」，保留可追溯
-                sev = "例外"
-                extra = (extra + "；" if extra else "") + "备注声明 [例外:" + rule + "]"
+                if rule in SAFETY_RULES:
+                    extra = ((extra + "；") if extra else "") + "例外声明被拒绝（安全规则不可例外）"
+                else:
+                    sev = "例外"
+                    extra = ((extra + "；") if extra else "") + "备注声明 [例外:" + rule + "]"
             issues.append((sev, si, rule, kind, detail, extra))
 
-        def check_runs(runs, where=""):
+        def check_runs(runs, where="", hf_zone=False):
             nonlocal max_size
             for r in runs:
                 if not r.text.strip():
                     continue
-                if r.font.size:
+                is_hf_run = hf_zone and run_color_hex(r) == P["hair"]
+                if r.font.size and not is_hf_run:
                     max_size = max(max_size, r.font.size.pt)
                     page_sizes.add(r.font.size.pt)
                 lat, ea = slots(r)
@@ -236,11 +343,9 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
                     if _eref is not None and _eref.get("idx", "0") not in ("0", "none"):
                         add("ERROR", "EFF.STYLE_REF", "主题特效引用", str(shp.shape_type),
                             f"effectRef idx={_eref.get('idx')} 指向主题外阴影，须删除 p:style")
-            if _el.find(".//" + qn("p:graphicFrame")) is not None:
-                if _el.findall(".//" + qn("a:graphicData")):
-                    uri = "".join(gd.get("uri", "") for gd in _el.findall(".//" + qn("a:graphicData")))
-                    if "diagram" in uri:      # SmartArt
-                        smartart += 1
+            for graphic_data in _el.iter(qn("a:graphicData")):
+                if "diagram" in (graphic_data.get("uri") or ""):      # SmartArt
+                    smartart += 1
             if getattr(shp, "has_chart", False):
                 try:
                     if "outerShdw" in shp.chart._chartSpace.xml:
@@ -307,13 +412,14 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
                     if not runs:
                         continue
                     size = max((r.font.size.pt if r.font.size else 18) for r in p.runs)
-                    ls = p.line_spacing if isinstance(p.line_spacing, (int, float)) else 1.0
+                    ls = line_spacing_factor(p, size)
                     n, longest = wrap_lines("".join(runs), size, bw)
-                    need += n * size * max(ls, 1.0) * 1.18
+                    need += n * size * ls * 1.18
                     if longest > bw * tol:
                         add("ERROR", "TXT.NOBREAK", "西文不可断行", "".join(runs)[:30],
                             f"最长段 {longest:.0f}pt / 栏宽 {bw:.0f}pt")
-                check_runs([r for p in tf.paragraphs for r in p.runs])
+                check_runs([r for p in tf.paragraphs for r in p.runs],
+                           hf_zone=is_hf_zone(t, h, sh_))
                 if bh > 0 and need > bh * tol:
                     add("ERROR", "TXT.OVERFLOW", "文本溢出", tf.text[:30].replace("\n", " "),
                         f"需 {need:.0f}pt / 框 {bh:.0f}pt")
@@ -343,9 +449,9 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
                             if not p.runs:
                                 continue
                             size = max((r.font.size.pt if r.font.size else 16) for r in p.runs)
-                            ls = p.line_spacing if isinstance(p.line_spacing, (int, float)) else 1.0
+                            ls = line_spacing_factor(p, size)
                             n, longest = wrap_lines("".join(r.text for r in p.runs), size, avail_w)
-                            need += n * size * max(ls, 1.0) * 1.18
+                            need += n * size * ls * 1.18
                             if longest > avail_w * tol:
                                 add("ERROR", "TXT.NOBREAK", "表格西文不可断行", tf.text[:24],
                                     f"列{ci} 最长段 {longest:.0f}pt / {avail_w:.0f}pt")
@@ -382,9 +488,10 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
             add("ERROR", "MED.SMARTART", "禁用对象", f"{smartart} 个 SmartArt",
                 "用普通形状/表格/图表表达；模板沿用需 --allow-smartart")
 
-        # 封面/章节页（存在 ≥36pt 标题）按实际讲解需要写备注，不适用字数下限；
+        # 封面/章节页（存在 ≥exempt_pt 标题）按实际讲解需要写备注，不适用字数下限；
         # 与 LAY.MEANS / 纯文字页比例的页型豁免同一判定口径。
-        if note_sev and len(notes) < n_min and max_size < 36:
+        page_max = max(max_size, placeholder_title_exempt(slide) or 0)
+        if note_sev and len(notes) < n_min and page_max < exempt_pt:
             add(note_sev, "NOTE.SHORT", "逐字稿过短", f"{len(notes)} 字 < {n_min}",
                 "备注写约 1 分钟逐字稿 + 口径备答（封面/章节页豁免）")
 
@@ -392,12 +499,12 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
         pure_text = not (chart_boxes or table_boxes or pic_boxes) and graphic_shapes == 0
         means = ("图表" if chart_boxes else "表格" if table_boxes else "图片" if pic_boxes
                  else "图形结构" if graphic_shapes else "纯排版")
-        if pure_text and max_size < 36 and len(page_sizes) < 2:
+        if pure_text and page_max < exempt_pt and len(page_sizes) < 2:
             add("SUGGESTION", "LAY.MEANS", "纯文字页无字号层级", f"仅 {len(page_sizes)} 档字号",
                 "纯文字页至少两级字号拉开主次（visual-means.md）；封面/章节页豁免")
         relation = _relation(table_boxes, chart_boxes, len(tb_boxes))
         # 封面/章节页（存在 ≥36pt 标题）允许纯排版，不计入纯文字页比例
-        layout_rows.append((si, relation, skeleton, means, pure_text, max_size >= 36))
+        layout_rows.append((si, relation, skeleton, means, pure_text, page_max >= exempt_pt))
 
     # ── LAY 规则（按档位分治）──
     if T["check_skeleton_repeat"] and len(prs.slides) >= T["skeleton_repeat_min_slides"]:
@@ -414,7 +521,7 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
                     else:
                         issues.append((T["skeleton_repeat_severity"], i, "LAY.REPEAT", "骨架重复",
                                        f"连续 {run} 页「{layout_rows[i-1][2]}」",
-                                       "例外：逐步揭示同一图可写 [例外:骨架重复]"))
+                                       "例外：逐步揭示同一图可写 [例外:LAY.REPEAT]（旧写法 [例外:骨架重复] 仍兼容）"))
                 run = 1
     ratio_cap = T["pure_text_ratio"]
     if ratio_cap is not None:
@@ -466,8 +573,10 @@ def main():
                           latin_fonts=a.latin_fonts, notes_min=a.notes_min,
                           tol=a.overflow_tol, allow_smartart=a.allow_smartart)
         if issues:
-            rc = 1
-            print("FAIL", os.path.basename(path), f"({len(issues)} 项)")
+            has_error = any(item[0] == "ERROR" for item in issues)
+            if has_error:
+                rc = 1
+            print("FAIL" if has_error else "WARN", os.path.basename(path), f"({len(issues)} 项)")
             print(format_findings(issues[:40]))
             if len(issues) > 40:
                 print("    ...另", len(issues) - 40, "项")
