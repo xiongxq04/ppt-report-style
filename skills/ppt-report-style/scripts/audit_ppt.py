@@ -242,6 +242,12 @@ def placeholder_title_exempt(slide):
                     return None
     except Exception:
         pass
+    try:
+        for shape in slide.shapes:
+            if getattr(shape, "has_chart", False) or getattr(shape, "has_table", False):
+                return None   # 带图表/表格的页面按内容页处理
+    except Exception:
+        pass
     return size
 
 
