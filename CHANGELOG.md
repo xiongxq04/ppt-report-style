@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.4.5（2026-11-01）—— 机审误报/漏报与例外机制收口
+
+> 背景：两份独立审查交叉验证（全库逐行 + 最小样本实测），修复 7 处硬缺陷，并对例外机制、文档口径与回归覆盖做结构性补强。
+
+### 硬缺陷
+- **SmartArt 检测恢复**：`.//p:graphicFrame` 只搜后代，顶层 SmartArt 永不命中（`MED.SMARTART` 空转）→ 改为 `_el.iter(a:graphicData)`，覆盖顶层与组内对象；反例补伪 SmartArt 页。
+- **固定值行距不再误判**：python-pptx 的 `Length` 是 int 子类，`Pt(24)` 被当成 30 万倍行距 → 先判 `Length` 再换算倍数（audit 形状/表格两处）。
+- **白底卡片底色修正**：显式白色填充不再被当作"无填充"，底层填充搜索不再跳过白色形状。
+- **表格单元格底色参与判定**：cell fill 作为文字底色，并纳入点缀配额与色相统计。
+- **点缀色文字不再豁免对比度**：accent/accent_deep 与普通文字同按实际底色判 4.5:1。
+- **骨架分类全宽表判据修正**：宽度 `t[2]` 取代高度 `t[3]`。
+- **字号统计口径**：HF 页眉页脚字号不计入 `TYP.STEPS` / `LAY.MEANS`；NOTE/MEANS 的页型豁免改取 `poster_pt`（fast 兜底 36），并支持占位符字号按版式/母版回落。
+- **字体集合收敛到 profile_lib**：audit/verify 不再各持一份；`FONT.TABLE_KAI` 兼容 KaiTi；补 仿宋/FangSong/MS Mincho 判定。
+
+### 例外机制
+- 新增规则 ID 注册表（40 个，含 `NOTE.EXCEPTION_UNKNOWN`）；备注标记与 `--exceptions` JSON 均按注册表校验。
+- 规范写法为 `[例外:规则ID]`；兼容 `[例外:骨架重复]` 与大小写；无法识别的标记报 `NOTE.EXCEPTION_UNKNOWN`（SUGGESTION），不再静默失效。
+- **安全规则不可例外**：`EFF.SHADOW`、`EFF.STYLE_REF`、`GEO.OUTSIDE`、`IMG.MISSING`、`IMG.RES`、`MED.SMARTART`、`PAL.CONTRAST`、`TXT.NOBREAK`、`TXT.OVERFLOW`、`TXT.TABLE_OVERFLOW`、`TYP.MINSIZE`；备注与 JSON 两条路径均保留 ERROR 并注明「例外声明被拒绝」。
+- 同页同规则折叠移到 `check_ppt.py` 合并后统一执行，audit 侧不再漏网；汇总行的「例外」计数改为包含备注例外。
+- 未知 JSON 规则 ID 直接报错退出 2。
+
+### 其他
+- 预览：CSS `font` 简写修正、图片 MIME 按实际类型、页码越界友好报错、docstring 色值校准；`check_ppt --preview-out` 传递预设 accent。
+- CLI：`--preset` 大小写统一；`audit_ppt.py` 退出码改为仅 ERROR 阻断。
+- 文档口径：checking 例外机制/严重度、SKILL NOTE 豁免与 36pt/口径分档、layout/effect 例外写法与骨架 ≥6 页、workflow 备注豁免、README 四预设与阈值真相源表述。
+- 回归：新增 guard 正例变体（固定行距/白卡/深底表头/点缀图表）与 safety 反例（安全例外被拒）；反例 EXPECTED 增补 `MED.SMARTART`；6 步回归全绿。
+
+### 验证
+- `run_regression.py` 全绿：正例 + 变体零误报、反例 19 条预期规则全命中、安全例外拒绝、预览生成通过。
+- 最小样本复跑：行距/白卡/表格不再误报，accent 压浅灰卡报 3.67:1，SmartArt 检出。
+
 ## v0.4.4（2026-10-31）—— 规则体系冲突清零：9 处前后矛盾逐项裁定
 
 > 背景：对规则体系自身做哲学级审计（宣称 ↔ 宣称、宣称 ↔ 实现），实证坐实 2 处硬冲突（预设 D 色觉宣称、`area_quotas` 死阈值），另清理 7 处适用域缺失与措辞漂移。修法原则：以 v0.4 机制为准，清除旧宣称；文档写清适用域而不是继续叠规则。
