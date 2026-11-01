@@ -20,8 +20,9 @@ from profile_lib import get_preset as _get_preset
 _ap = argparse.ArgumentParser()
 _ap.add_argument("out", nargs="?", default=os.path.join(HERE, "..", "assets", "example-slide.pptx"),
                  help="输出路径（兼容旧用法：位置参数）")
-_ap.add_argument("--variant", choices=("academic", "negative", "guard", "safety"), default="academic",
-                 help="academic=6 页正例；negative=回归反例；guard=正例变体；safety=安全例外反例")
+_ap.add_argument("--variant", choices=("academic", "negative", "guard", "safety", "placeholder"),
+                 default="academic",
+                 help="academic=6 页正例；negative=回归反例；guard=正例变体；safety=安全例外反例；placeholder=占位符页型")
 _ap.add_argument("--out", dest="out_opt", default=None, help="输出路径（与位置参数二选一）")
 _ap.add_argument("--preset", default="A", help="配色预设 A|B|C|D（大小写均可）")
 _a = _ap.parse_args()
@@ -392,6 +393,38 @@ def build_safety(path):
     print("saved(safety)", os.path.normpath(path))
 
 
+def build_placeholder(path):
+    """占位符页型回归：封面豁免；仅标题空页豁免；仅标题+正文/图表按内容页处理。"""
+    prs = Presentation()
+    SHORT = "短备注。"
+
+    s = prs.slides.add_slide(prs.slide_layouts[0])       # P1 封面（CENTER_TITLE）
+    s.shapes.title.text = "封面：继承字号标题"
+    s.placeholders[1].text = "副标题"
+    s.notes_slide.notes_text_frame.text = SHORT
+
+    s = prs.slides.add_slide(prs.slide_layouts[5])       # P2 仅标题空页
+    s.shapes.title.text = "仅标题的章节空页"
+    s.notes_slide.notes_text_frame.text = SHORT
+
+    s = prs.slides.add_slide(prs.slide_layouts[5])       # P3 仅标题 + 正文文本框
+    s.shapes.title.text = "仅标题版式里的正文页"
+    box = s.shapes.add_textbox(Inches(1.0), Inches(2.5), Inches(7.0), Inches(2.0))
+    box.text_frame.word_wrap = True
+    box.text_frame.paragraphs[0].add_run().text = "正文写在普通文本框里，没有正文占位符，应按内容页处理。"
+    s.notes_slide.notes_text_frame.text = SHORT
+
+    s = prs.slides.add_slide(prs.slide_layouts[5])       # P4 仅标题 + 图表
+    s.shapes.title.text = "仅标题版式里的图表页"
+    data = CategoryChartData(); data.categories = ["甲", "乙"]; data.add_series("值", (0.4, 0.6))
+    s.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED,
+                       Inches(1.0), Inches(2.5), Inches(7.0), Inches(2.5), data)
+    s.notes_slide.notes_text_frame.text = SHORT
+
+    prs.save(path)
+    print("saved(placeholder)", os.path.normpath(path))
+
+
 def build_negative(path):
     """回归反例：在 balanced 档下必须命中预期规则集（见 run_regression.py）。"""
     prs = Presentation(); prs.slide_width = 12192000; prs.slide_height = 6858000
@@ -495,6 +528,9 @@ if VARIANT == "guard":
     sys.exit(0)
 if VARIANT == "safety":
     build_safety(OUT)
+    sys.exit(0)
+if VARIANT == "placeholder":
+    build_placeholder(OUT)
     sys.exit(0)
 
 prs.save(OUT)

@@ -224,13 +224,23 @@ def title_placeholder_size(slide):
     return None
 
 
-def placeholder_title_exempt(slide):
-    """占位符版的封面/章节页判定：标题字号够大，且没有带文字的正文占位符。
-    返回生效标题字号；带正文占位符（BODY/OBJECT 且有文字）时返回 None，
-    避免把模板里的普通内容页当成封面。"""
+def placeholder_title_exempt(slide, page_h=7.5):
+    """占位符版的封面/章节页判定：标题字号够大。
+
+    封面（CENTER_TITLE 版式）整体豁免，允许作者/日期等附加文本框；
+    其余标题页只要带正文占位符文字、或非占位符正文/图表/表格（HF 页眉页脚区除外），
+    就按内容页处理，避免"仅标题版式 + 文本框正文"被误当封面。"""
     size = title_placeholder_size(slide)
     if size is None:
         return None
+    try:
+        title = slide.shapes.title
+        is_cover = (title is not None
+                    and title.placeholder_format.type == PP_PLACEHOLDER.CENTER_TITLE)
+    except Exception:
+        is_cover = False
+    if is_cover:
+        return size
     try:
         for placeholder in slide.placeholders:
             try:
@@ -244,8 +254,15 @@ def placeholder_title_exempt(slide):
         pass
     try:
         for shape in slide.shapes:
+            if getattr(shape, "is_placeholder", False):
+                continue
             if getattr(shape, "has_chart", False) or getattr(shape, "has_table", False):
                 return None   # 带图表/表格的页面按内容页处理
+            if getattr(shape, "has_text_frame", False) and shape.text_frame.text.strip():
+                top = shape.top / EMU_IN if shape.top is not None else None
+                height = shape.height / EMU_IN if shape.height is not None else None
+                if not is_hf_zone(top, height, page_h):
+                    return None   # 非占位符正文（页脚区除外）
     except Exception:
         pass
     return size
@@ -496,7 +513,7 @@ def audit(path, tier="balanced", preset="A", fonts=None, latin_fonts=None,
 
         # 封面/章节页（存在 ≥exempt_pt 标题）按实际讲解需要写备注，不适用字数下限；
         # 与 LAY.MEANS / 纯文字页比例的页型豁免同一判定口径。
-        page_max = max(max_size, placeholder_title_exempt(slide) or 0)
+        page_max = max(max_size, placeholder_title_exempt(slide, sh_) or 0)
         if note_sev and len(notes) < n_min and page_max < exempt_pt:
             add(note_sev, "NOTE.SHORT", "逐字稿过短", f"{len(notes)} 字 < {n_min}",
                 "备注写约 1 分钟逐字稿 + 口径备答（封面/章节页豁免）")
