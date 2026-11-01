@@ -1,6 +1,6 @@
 {
-  "$comment": "ppt-report-style 唯一阈值真相源（v0.4.4）。任何文档或脚本与本文件冲突时，以本文件为准。三档严格度 × 四套配色预设。",
-  "version": "0.4.4",
+  "$comment": "ppt-report-style 唯一阈值真相源（v0.4.5）。任何文档或脚本与本文件冲突时，以本文件为准。三档严格度 × 四套配色预设。",
+  "version": "0.4.5",
   "tiers": {
     "fast": {
       "label": "L1 快速档",
@@ -122,6 +122,6 @@
       "white": "FFFFFF"
     }
   },
-  "skeleton_repeat_note": "连续 3 页同主骨架：balanced 报 WARNING；strict 仅在 deck ≥10 页时降为 SUGGESTION（统一骨架是学术美德）；fast 不检查。",
+  "skeleton_repeat_note": "连续 3 页同主骨架：balanced 仅在整套 ≥6 页时统计并报 WARNING；strict 仅在 deck ≥10 页时降为 SUGGESTION（统一骨架是学术美德）；fast 不检查。",
   "hf_zone_note": "页眉页脚极浅灰档（hair 色）仅在页眉区（top+height ≤ 0.7in）或页脚区（top ≥ 7.0in）享受 hf_min_size 与对比度豁免；其余位置按正文规则正常检查。"
 }

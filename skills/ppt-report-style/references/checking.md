@@ -15,20 +15,19 @@
 - 图片缺失，或按放置尺寸计算的分辨率严重不足；
 - 数字无法追溯到材料或实算；
 - 用户要求保留的模板元素被意外删除；
-- 严格档下新增的 SmartArt、继承字体颜色。
+- 新增的 SmartArt（任何档位；模板沿用需 `--allow-smartart`）；
 
 ### 警告（WARNING）
 
 需要人工确认，不自动判定失败：
 
-- 连续三页使用同一主骨架、纯文字页比例偏高、方块矩阵页过半；
+- 连续三页使用同一主骨架、纯文字页比例偏高（机审）；方块矩阵页过半、关系模型覆盖不足（人工审阅）；
 - 图片分辨率偏低、长边像素不足、可能与文字重叠；
 - 主题字体、继承颜色无法可靠解析；
 - HTML 近似预览与 PowerPoint 最终渲染可能不同；
 - 文本溢出估算接近阈值；
 - 字符可能在特定字体中缺少字形（GBK 范围外）；
 - 组合形状、嵌入对象未递归审查；
-- 平衡档下检出 SmartArt。
 
 ### 建议（SUGGESTION）
 
@@ -55,7 +54,7 @@
 | `IMG.` | 配图 | `IMG.RES` 按放置尺寸分辨率不足（<96dpi ERROR，<150dpi WARNING）、`IMG.MISSING` 图片数据无法读取（WARNING）、`IMG.QUALITY` 长边像素过低（WARNING） |
 | `EFF.` | 效果 | `EFF.SHADOW` 阴影/特效、`EFF.STYLE_REF` 主题特效引用（effectRef） |
 | `MED.` | 媒体与对象 | `MED.SMARTART` 禁用对象 |
-| `NOTE.` | 备注 | `NOTE.SHORT` 逐字稿过短（档位分治；封面/章节页按 ≥36pt 标题识别豁免） |
+| `NOTE.` | 备注 | `NOTE.SHORT` 逐字稿过短（档位分治；封面/章节页按 ≥36pt 标题识别豁免，含占位符继承字号）、`NOTE.EXCEPTION_UNKNOWN` 例外标记无法识别（SUGGESTION） |
 
 ## 统一结果协议
 
@@ -63,11 +62,11 @@
 
 ## 例外机制
 
-- **页面级例外**在该页备注写 `[例外:规则名]` + 一句理由（如 `[例外:LAY.REPEAT] 同一图表分三页展开`）——命中规则的发现降级为「例外」并保留在报告中，可追溯。适用于页级规则；全片级规则（`TXT.PREFIX`、`TXT.CAVEAT`、`LAY.PURETEXT`）请用 JSON 例外。
+- **页面级例外**在该页备注写 `[例外:规则ID]` + 一句理由（如 `[例外:LAY.REPEAT] 同一图表分三页展开`）——命中规则的发现降级为「例外」并保留在报告中，可追溯。规则 ID 见上表；唯一兼容的中文别名是 `[例外:骨架重复]`（= `LAY.REPEAT`）。无法识别或拼写错误的标记会报 `NOTE.EXCEPTION_UNKNOWN`（SUGGESTION），不再静默失效。适用于页级规则；全片级规则（`TXT.PREFIX`、`TXT.CAVEAT`、`LAY.PURETEXT`）请用 JSON 例外。
 - 结构性例外用参数声明：沿用原模板保留 SmartArt 用 `--allow-smartart`。
-- 长期例外写进 `exceptions.json`，用 `--exceptions` 传入；命中例外的条目降级为"例外"并在报告中保留，不直接丢弃。
-- 同页同规则的重复发现最多报 3 条（`--max-per-rule` 可调），超出部分静默截断——修掉已报的通常会让其余同因问题消失。
-- 例外不会降级安全、版权与可读性规则：对比度、字号、缺失图片和禁用对象仍然报错。
+- 长期例外写进 `exceptions.json`，用 `--exceptions` 传入；`rule` 必须是上表的规则 ID（未知 ID 直接报错退出），命中例外的条目降级为"例外"并在报告中保留，不直接丢弃；命中安全规则时保留原严重度并注明「例外声明被拒绝」。
+- 同页同规则的重复发现最多报 3 条（`--max-per-rule` 可调），超出部分静默截断——修掉已报的通常会让其余同因问题消失。折叠在 `check_ppt.py` 合并 audit 与 verify 之后统一执行。
+- 例外不会降级安全规则：`EFF.SHADOW`、`EFF.STYLE_REF`、`GEO.OUTSIDE`、`IMG.MISSING`、`IMG.RES`、`MED.SMARTART`、`PAL.CONTRAST`、`TXT.NOBREAK`、`TXT.OVERFLOW`、`TXT.TABLE_OVERFLOW`、`TYP.MINSIZE` 在任何档位、任何例外路径下都保持原严重度。
 
 ## 检查顺序
 

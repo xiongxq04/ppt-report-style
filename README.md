@@ -55,7 +55,7 @@ $ppt-report-style 帮我做一套关于××的汇报 PPT，10 页，strict 档�
 
 ## 阈值真相源
 
-所有阈值集中在 **`skills/ppt-report-style/references/profiles.json`**（三档 × 四预设）：字号下限、字阶、白名单、限额、备注下限、骨架规则。文档只引用不重定义，脚本经 `profile_lib.py` 读取——改一处，全仓生效。
+档位与预设阈值集中在 **`skills/ppt-report-style/references/profiles.json`**（三档 × 四预设）：字号下限、字阶、白名单、限额、备注下限、骨架规则。文档只引用不重定义，脚本经 `profile_lib.py` 读取。版式几何（如页眉页脚判定的 0.7/7.0in）、36pt 标题豁免、图像 96/150dpi 等实现常量仍在 SKILL.md 与脚本中声明，改动需同步脚本与文档。
 
 ## 脚本
 
@@ -108,7 +108,7 @@ ppt-report-style/
     ├── agents/openai.yaml
     ├── assets/                    # 6 页学术示例与预览图
     ├── references/
-    │   ├── profiles.json          # ★ 三档 × 三预设的阈值唯一真相源
+    │   ├── profiles.json          # ★ 三档 × 四预设的阈值唯一真相源
     │   ├── workflow.md            # 分阶段工作流与返工触发条件
     │   ├── palette-system.md      # 配色预设与对比度
     │   ├── palette-library.md     # 外部色板库（7 组实算对比度，选材来源）
